@@ -34,6 +34,8 @@ class UniverseFilterConfig:
     min_vol_quote_24h: Decimal = DEFAULT_MIN_VOL_QUOTE_24H
     max_spread_bps: Decimal = DEFAULT_MAX_SPREAD_BPS
     max_notional_per_trade: Decimal = DEFAULT_MAX_NOTIONAL_PER_TRADE
+    default_leverage: Decimal = Decimal("3")
+    max_margin_per_trade: Decimal = Decimal("3.33")
     exclude_stablecoins: bool = True
     require_live: bool = True
 
@@ -44,6 +46,8 @@ class UniverseFilterConfig:
             raise ValueError("max_spread_bps must be > 0")
         if self.max_notional_per_trade <= Decimal(0):
             raise ValueError("max_notional_per_trade must be > 0")
+        if self.default_leverage <= Decimal(0):
+            raise ValueError("default_leverage must be > 0")
 
 
 @dataclass(frozen=True)
@@ -162,20 +166,41 @@ def filter_tradable_universe(
             continue
 
         # 6. Minimum order size vs micro-portfolio capital ($10)
-        # Minimum notional required to place an order = min_size * ask_px
-        min_notional = rule.min_size * ticker.ask_px
-        if min_notional > cfg.max_notional_per_trade:
-            rejected.append(
-                RejectedInstrument(
-                    inst_id=inst_id,
-                    reason="MIN_ORDER_EXCEEDS_BUDGET",
-                    details=(
-                        f"Min order notional {min_notional:.4f} USDT (min_size={rule.min_size} * "
-                        f"ask={ticker.ask_px}) exceeds max capital per trade {cfg.max_notional_per_trade} USDT"
-                    ),
+        # Minimum notional required to place an order = min_size * ct_val * ct_mult * ask_px
+        ct_val = getattr(rule, "ct_val", Decimal("1"))
+        ct_mult = getattr(rule, "ct_mult", Decimal("1"))
+        min_notional = rule.min_size * ct_val * ct_mult * ticker.ask_px
+
+        if rule.inst_id.endswith("-SWAP") or ct_val != Decimal("1"):
+            # Micro-Account Futures Contract Gate ($10.0)
+            default_lev = getattr(cfg, "default_leverage", Decimal("3"))
+            min_margin_required = min_notional / default_lev
+            margin_budget = getattr(cfg, "max_margin_per_trade", cfg.max_notional_per_trade)
+            if min_margin_required > margin_budget:
+                rejected.append(
+                    RejectedInstrument(
+                        inst_id=inst_id,
+                        reason="CONTRACT_VALUE_EXCEEDS_MARGIN_BUDGET",
+                        details=(
+                            f"Min order margin {min_margin_required:.4f} USDT (notional={min_notional:.4f} / "
+                            f"leverage={default_lev}) exceeds margin budget {margin_budget} USDT"
+                        ),
+                    )
                 )
-            )
-            continue
+                continue
+        else:
+            if min_notional > cfg.max_notional_per_trade:
+                rejected.append(
+                    RejectedInstrument(
+                        inst_id=inst_id,
+                        reason="MIN_ORDER_EXCEEDS_BUDGET",
+                        details=(
+                            f"Min order notional {min_notional:.4f} USDT (min_size={rule.min_size} * "
+                            f"ask={ticker.ask_px}) exceeds max capital per trade {cfg.max_notional_per_trade} USDT"
+                        ),
+                    )
+                )
+                continue
 
         # Passed all gates
         passed.append(

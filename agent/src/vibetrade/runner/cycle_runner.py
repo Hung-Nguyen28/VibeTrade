@@ -67,7 +67,13 @@ from src.vibetrade.state import (
 )
 from src.vibetrade.verification import VerificationGate
 
-DEFAULT_SYMBOLS: tuple[str, ...] = ("BTC-USDT", "ETH-USDT", "SOL-USDT", "DOGE-USDT", "AVAX-USDT")
+DEFAULT_SYMBOLS: tuple[str, ...] = (
+    "BTC-USDT-SWAP",
+    "ETH-USDT-SWAP",
+    "SOL-USDT-SWAP",
+    "DOGE-USDT-SWAP",
+    "AVAX-USDT-SWAP",
+)
 
 
 @dataclass(frozen=True)
@@ -105,6 +111,11 @@ def generate_mock_market_data(
     tf_15m_ms = 15 * 60 * 1000
 
     base_prices = {
+        "BTC-USDT-SWAP": 70000.0,
+        "ETH-USDT-SWAP": 3000.0,
+        "SOL-USDT-SWAP": 150.0,
+        "DOGE-USDT-SWAP": 0.20,
+        "AVAX-USDT-SWAP": 30.0,
         "BTC-USDT": 70000.0,
         "ETH-USDT": 3000.0,
         "SOL-USDT": 150.0,
@@ -112,9 +123,19 @@ def generate_mock_market_data(
         "AVAX-USDT": 30.0,
     }
 
+    ct_val_map = {
+        "BTC": Decimal("0.01"),
+        "ETH": Decimal("0.1"),
+        "SOL": Decimal("1"),
+        "DOGE": Decimal("100"),
+        "AVAX": Decimal("1"),
+    }
+
     for sym in symbols:
         base_ccy = sym.split("-")[0]
         base_px = base_prices.get(sym, 50.0)
+        is_swap = sym.endswith("-SWAP")
+        ct_val = ct_val_map.get(base_ccy, Decimal("1")) if is_swap else Decimal("1")
 
         # Rule
         rules.append(
@@ -123,9 +144,14 @@ def generate_mock_market_data(
                 base_ccy=base_ccy,
                 quote_ccy="USDT",
                 tick_size=Decimal("0.01"),
-                lot_size=Decimal("0.01"),
-                min_size=Decimal("0.01"),
+                lot_size=Decimal("1") if is_swap else Decimal("0.01"),
+                min_size=Decimal("1") if is_swap else Decimal("0.01"),
                 state="live",
+                ct_val=ct_val,
+                ct_mult=Decimal("1"),
+                max_lever=Decimal("100"),
+                ct_type="linear",
+                settle_ccy="USDT",
             )
         )
 
@@ -164,7 +190,7 @@ def generate_mock_market_data(
             vol = 1000.0
 
             # If anomaly trigger is requested on the last bar
-            if sym == trigger_anomaly_on and i == bar_count - 1:
+            if trigger_anomaly_on and (sym == trigger_anomaly_on or sym.startswith(trigger_anomaly_on.split("-")[0])) and i == bar_count - 1:
                 p = base_px * (1.0 + drift) * 1.018  # Breakout jump
                 vol = 6000.0  # Volume spike (RVOL=6.0)
 
@@ -260,6 +286,9 @@ class StatelessCycleRunner:
                 portfolio.total_schedule_drift_cost_usdt = Decimal(
                     str(prior_portfolio_doc.get("total_schedule_drift_cost_usdt", "0.00"))
                 )
+                portfolio.total_funding_fees_usdt = Decimal(
+                    str(prior_portfolio_doc.get("total_funding_fees_usdt", "0.00"))
+                )
                 for pos_raw in prior_portfolio_doc.get("open_positions", []):
                     pos = OpenPosition(
                         position_id=str(pos_raw["position_id"]),
@@ -277,6 +306,15 @@ class StatelessCycleRunner:
                         schedule_drift_cost_usdt=Decimal(str(pos_raw["schedule_drift_cost_usdt"])),
                         current_mark_price=Decimal(str(pos_raw["current_mark_price"])),
                         unrealized_pnl_usdt=Decimal(str(pos_raw["unrealized_pnl_usdt"])),
+                        side=str(pos_raw.get("side", "LONG")),
+                        leverage=Decimal(str(pos_raw.get("leverage", "3"))),
+                        isolated_margin_usdt=Decimal(str(pos_raw.get("isolated_margin_usdt", "0"))),
+                        contracts=Decimal(str(pos_raw.get("contracts", "0"))),
+                        ct_val=Decimal(str(pos_raw.get("ct_val", "1"))),
+                        liquidation_price=Decimal(str(pos_raw.get("liquidation_price", "0"))),
+                        stop_loss_price=Decimal(str(pos_raw.get("stop_loss_price", "0"))),
+                        take_profit_price=Decimal(str(pos_raw.get("take_profit_price", "0"))),
+                        accumulated_funding_usdt=Decimal(str(pos_raw.get("accumulated_funding_usdt", "0"))),
                     )
                     portfolio._open_positions[pos.inst_id] = pos
 
@@ -293,15 +331,15 @@ class StatelessCycleRunner:
 
                 client = OKXPublicClient()
                 rules = list(client.get_instruments())
-                tickers_res = client.get_spot_tickers()
+                tickers_res = client.get_tickers("SWAP")
                 tickers = list(tickers_res.tickers)
                 candles_by_symbol = {}
                 orderbooks = {}
                 for sym in self.symbols:
                     try:
-                        c_list = client.get_closed_candles(sym, timeframe="15m", limit=35)
+                        c_list = client.get_closed_candles(sym, bar="15m", limit=35)
                         candles_by_symbol[sym] = list(c_list)
-                        bk = client.get_orderbook(sym, depth=20, probe_notional_usdt=Decimal("10.00"))
+                        bk = client.get_orderbook_snapshot(sym, depth=20, probe_notional_usdt=Decimal("10.00"))
                         orderbooks[sym] = bk
                     except Exception:
                         pass
@@ -317,7 +355,7 @@ class StatelessCycleRunner:
             )
 
             # 3. P2 — Market Scanner & Regime
-            btc_candles = candles_by_symbol.get("BTC-USDT", [])
+            btc_candles = candles_by_symbol.get("BTC-USDT-SWAP", candles_by_symbol.get("BTC-USDT", []))
             regime_snapshot = detect_market_regime(
                 btc_candles=btc_candles,
                 tickers=tickers,
@@ -332,18 +370,50 @@ class StatelessCycleRunner:
                 config=ScannerConfig(),
             )
 
-            # 4. Portfolio Maintenance: Update mark-to-market prices & check TP/SL
+            # 4. Portfolio Maintenance: Update mark prices, funding fee & check Wick Liquidation / SL / TP
             mark_prices = {t.inst_id: t.last for t in tickers}
             portfolio.update_mark_prices(mark_prices)
 
-            # Check exits for any open positions
+            # Funding fee accounting: 8-hour intervals (00:00, 08:00, 16:00 UTC)
+            is_funding_window = (current_time % (8 * 3600 * 1000)) < (15 * 60 * 1000)
+            if is_funding_window:
+                for inst_id, pos in list(portfolio.open_positions.items()):
+                    if pos.inst_id.endswith("-SWAP") or pos.contracts > 0:
+                        portfolio.apply_funding_fee(inst_id, Decimal("0.0001"), current_time)
+
+            # Check exits using latest closed candle High/Low
             for inst_id, pos in list(portfolio.open_positions.items()):
-                mark_px = mark_prices.get(inst_id, pos.current_mark_price)
-                pct_return = (mark_px - pos.entry_price) / pos.entry_price * Decimal("100.0")
-                if pct_return >= Decimal("5.0"):  # Take profit at +5%
-                    portfolio.close_position(inst_id, mark_px, current_time, "TAKE_PROFIT", self.paper_config.fee_rate)
-                elif pct_return <= Decimal("-3.0"):  # Stop loss at -3%
-                    portfolio.close_position(inst_id, mark_px, current_time, "STOP_LOSS", self.paper_config.fee_rate)
+                sym_candles = candles_by_symbol.get(inst_id, [])
+                latest_candle = sym_candles[-1] if sym_candles else None
+
+                if latest_candle is not None:
+                    c_high = latest_candle.high
+                    c_low = latest_candle.low
+
+                    if pos.side in {"SHORT", "SELL"}:
+                        if c_high >= pos.liquidation_price:
+                            portfolio.close_position(inst_id, pos.liquidation_price, current_time, "LIQUIDATED", self.paper_config.fee_rate)
+                        elif c_high >= pos.stop_loss_price:
+                            portfolio.close_position(inst_id, pos.stop_loss_price, current_time, "STOP_LOSS", self.paper_config.fee_rate)
+                        elif c_low <= pos.take_profit_price:
+                            portfolio.close_position(inst_id, pos.take_profit_price, current_time, "TAKE_PROFIT", self.paper_config.fee_rate)
+                    else:
+                        if c_low <= pos.liquidation_price:
+                            portfolio.close_position(inst_id, pos.liquidation_price, current_time, "LIQUIDATED", self.paper_config.fee_rate)
+                        elif c_low <= pos.stop_loss_price:
+                            portfolio.close_position(inst_id, pos.stop_loss_price, current_time, "STOP_LOSS", self.paper_config.fee_rate)
+                        elif c_high >= pos.take_profit_price:
+                            portfolio.close_position(inst_id, pos.take_profit_price, current_time, "TAKE_PROFIT", self.paper_config.fee_rate)
+                else:
+                    mark_px = mark_prices.get(inst_id, pos.current_mark_price)
+                    if pos.side in {"SHORT", "SELL"}:
+                        pct_return = (pos.entry_price - mark_px) / pos.entry_price * Decimal("100.0")
+                    else:
+                        pct_return = (mark_px - pos.entry_price) / pos.entry_price * Decimal("100.0")
+                    if pct_return >= Decimal("5.0"):
+                        portfolio.close_position(inst_id, mark_px, current_time, "TAKE_PROFIT", self.paper_config.fee_rate)
+                    elif pct_return <= Decimal("-3.0"):
+                        portfolio.close_position(inst_id, mark_px, current_time, "STOP_LOSS", self.paper_config.fee_rate)
 
             # 5. P3 — Hybrid Event Engine & Idempotency Seeding
             prior_queue_doc = self.state_mgr.load_doc("opportunity_queue")
@@ -443,6 +513,8 @@ class StatelessCycleRunner:
                         orderbook=book,
                     )
 
+                    order_side = "SHORT" if report.verdict == "ACTIONABLE_SHORT" else "LONG"
+
                     if risk_decision.approved:
                         exec_res = simulate_order_execution(
                             inst_rule=rule,
@@ -456,6 +528,8 @@ class StatelessCycleRunner:
                             price_at_candle_close=Decimal(str(c_15m[-1].close if c_15m else book.mid_price)),
                             mode=ExecutionMode.LIVE_PAPER,
                             config=self.paper_config,
+                            side=order_side,
+                            leverage=self.risk_controller.config.max_leverage,
                         )
                         if exec_res.success and exec_res.position:
                             portfolio.open_position(exec_res)
@@ -469,7 +543,7 @@ class StatelessCycleRunner:
                             order_id=f"ord:{cand.signal_id}:{current_time}",
                             signal_id=cand.signal_id,
                             inst_id=sym,
-                            side="BUY",
+                            side=order_side,
                             proposed_notional_usdt=proposed_notional,
                             constraint_code=risk_decision.constraint_code or "RISK_REJECTED",
                             details=risk_decision.details,

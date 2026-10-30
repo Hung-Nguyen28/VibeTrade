@@ -91,20 +91,40 @@ def _check_decimal_field(obj: Any, name: str, *, positive: bool = True) -> None:
 
 
 def _check_usdt_inst_id(inst_id: str) -> None:
-    if not isinstance(inst_id, str) or not inst_id.endswith(f"-{QUOTE_CCY}") or inst_id.count("-") != 1:
-        raise ModelValidationError(f"inst_id must be a '<BASE>-{QUOTE_CCY}' Spot pair (got {inst_id!r})")
+    if not isinstance(inst_id, str):
+        raise ModelValidationError(f"inst_id must be a string (got {inst_id!r})")
+    if not (inst_id.endswith(f"-{QUOTE_CCY}") or inst_id.endswith(f"-{QUOTE_CCY}-SWAP")):
+        raise ModelValidationError(f"inst_id must be a '<BASE>-{QUOTE_CCY}' Spot pair or '<BASE>-{QUOTE_CCY}-SWAP' Futures contract (got {inst_id!r})")
     if inst_id != inst_id.upper():
         raise ModelValidationError(f"inst_id must be upper-case (got {inst_id!r})")
+    if inst_id.endswith(f"-{QUOTE_CCY}-SWAP"):
+        base = inst_id[:-len(f"-{QUOTE_CCY}-SWAP")]
+        if not base or "-" in base:
+            raise ModelValidationError(f"inst_id must be a '<BASE>-{QUOTE_CCY}-SWAP' Futures contract (got {inst_id!r})")
+    elif inst_id.endswith(f"-{QUOTE_CCY}"):
+        base = inst_id[:-len(f"-{QUOTE_CCY}")]
+        if not base or "-" in base:
+            raise ModelValidationError(f"inst_id must be a '<BASE>-{QUOTE_CCY}' Spot pair (got {inst_id!r})")
+
+
+def calculate_notional_usdt(
+    contracts: Decimal,
+    ct_val: Decimal,
+    price: Decimal,
+    ct_mult: Decimal = Decimal("1"),
+) -> Decimal:
+    """Calculate exact notional USDT value for OKX linear futures contracts."""
+    return contracts * ct_val * ct_mult * price
 
 
 # ---------------------------------------------------------------------------
-# SpotInstrumentRule
+# SpotInstrumentRule & FuturesInstrumentRule
 # ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class SpotInstrumentRule:
-    """Trading rules of one OKX Spot pair (``/public/instruments?instType=SPOT``)."""
+    """Trading rules of an OKX Spot pair or USDT Perpetual Futures contract."""
 
     inst_id: str
     base_ccy: str
@@ -113,32 +133,61 @@ class SpotInstrumentRule:
     lot_size: Decimal
     min_size: Decimal
     state: str
+    ct_val: Decimal = Decimal("1")
+    ct_mult: Decimal = Decimal("1")
+    max_lever: Decimal = Decimal("100")
+    ct_type: str = "linear"
+    settle_ccy: str = "USDT"
 
     def __post_init__(self) -> None:
         _check_usdt_inst_id(self.inst_id)
         if self.quote_ccy != QUOTE_CCY:
             raise ModelValidationError(f"quote_ccy must be {QUOTE_CCY} (got {self.quote_ccy!r})")
-        if self.inst_id != f"{self.base_ccy}-{self.quote_ccy}":
-            raise ModelValidationError("inst_id does not match base_ccy/quote_ccy")
-        for name in ("tick_size", "lot_size", "min_size"):
+        if self.inst_id.endswith("-SWAP"):
+            if self.inst_id != f"{self.base_ccy}-{self.quote_ccy}-SWAP":
+                raise ModelValidationError("inst_id does not match base_ccy/quote_ccy-SWAP")
+        else:
+            if self.inst_id != f"{self.base_ccy}-{self.quote_ccy}":
+                raise ModelValidationError("inst_id does not match base_ccy/quote_ccy")
+        for name in ("tick_size", "lot_size", "min_size", "ct_val", "ct_mult", "max_lever"):
             _check_decimal_field(self, name)
         if not self.state:
             raise ModelValidationError("state: empty")
 
     @classmethod
     def from_okx(cls, row: Mapping[str, Any]) -> "SpotInstrumentRule":
+        inst_id = str(row.get("instId", ""))
+        base_ccy = str(row.get("baseCcy") or row.get("ctValCcy") or "")
+        if not base_ccy and "-" in inst_id:
+            base_ccy = inst_id.split("-")[0]
+        quote_ccy = str(row.get("quoteCcy") or row.get("settleCcy") or QUOTE_CCY)
+
+        ct_val_raw = row.get("ctVal")
+        ct_val = _positive(ct_val_raw, "ctVal") if ct_val_raw is not None and str(ct_val_raw).strip() != "" else Decimal("1")
+
+        ct_mult_raw = row.get("ctMult")
+        ct_mult = _positive(ct_mult_raw, "ctMult") if ct_mult_raw is not None and str(ct_mult_raw).strip() != "" else Decimal("1")
+
+        max_lever_raw = row.get("maxLever")
+        max_lever = _positive(max_lever_raw, "maxLever") if max_lever_raw is not None and str(max_lever_raw).strip() != "" else Decimal("100")
+
         return cls(
-            inst_id=str(row.get("instId", "")),
-            base_ccy=str(row.get("baseCcy", "")),
-            quote_ccy=str(row.get("quoteCcy", "")),
+            inst_id=inst_id,
+            base_ccy=base_ccy,
+            quote_ccy=quote_ccy,
             tick_size=_positive(row.get("tickSz"), "tickSz"),
             lot_size=_positive(row.get("lotSz"), "lotSz"),
             min_size=_positive(row.get("minSz"), "minSz"),
             state=str(row.get("state", "")),
+            ct_val=ct_val,
+            ct_mult=ct_mult,
+            max_lever=max_lever,
+            ct_type=str(row.get("ctType", "linear")),
+            settle_ccy=str(row.get("settleCcy", quote_ccy)),
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        res: dict[str, Any] = {
             "inst_id": self.inst_id,
             "base_ccy": self.base_ccy,
             "quote_ccy": self.quote_ccy,
@@ -146,6 +195,90 @@ class SpotInstrumentRule:
             "lot_size": dec_str(self.lot_size),
             "min_size": dec_str(self.min_size),
             "state": self.state,
+        }
+        if self.inst_id.endswith("-SWAP") or self.ct_val != Decimal("1"):
+            res["ct_val"] = dec_str(self.ct_val)
+            res["ct_mult"] = dec_str(self.ct_mult)
+            res["max_lever"] = dec_str(self.max_lever)
+            res["ct_type"] = self.ct_type
+            res["settle_ccy"] = self.settle_ccy
+        return res
+
+
+FuturesInstrumentRule = SpotInstrumentRule
+
+
+# ---------------------------------------------------------------------------
+# MarkPrice & FundingRate (Perpetual Futures)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class MarkPrice:
+    """OKX Mark Price snapshot for Perpetual Futures (``/public/mark-price``)."""
+
+    inst_id: str
+    mark_px: Decimal
+    ts_utc_ms: int
+
+    def __post_init__(self) -> None:
+        _check_usdt_inst_id(self.inst_id)
+        _check_decimal_field(self, "mark_px")
+        if not isinstance(self.ts_utc_ms, int) or isinstance(self.ts_utc_ms, bool) or self.ts_utc_ms <= 0:
+            raise ModelValidationError("ts_utc_ms must be a positive int")
+
+    @classmethod
+    def from_okx(cls, row: Mapping[str, Any]) -> "MarkPrice":
+        return cls(
+            inst_id=str(row.get("instId", "")),
+            mark_px=_positive(row.get("markPx"), "markPx"),
+            ts_utc_ms=parse_epoch_ms(row.get("ts"), "ts"),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "inst_id": self.inst_id,
+            "mark_px": dec_str(self.mark_px),
+            "ts_utc_ms": self.ts_utc_ms,
+        }
+
+
+@dataclass(frozen=True)
+class FundingRate:
+    """OKX Perpetual Funding Rate snapshot (``/public/funding-rate``)."""
+
+    inst_id: str
+    funding_rate: Decimal
+    next_funding_rate: Decimal | None
+    funding_time_utc_ms: int
+    ts_utc_ms: int
+
+    def __post_init__(self) -> None:
+        _check_usdt_inst_id(self.inst_id)
+        _check_decimal_field(self, "funding_rate", positive=False)
+        if not isinstance(self.funding_time_utc_ms, int) or isinstance(self.funding_time_utc_ms, bool) or self.funding_time_utc_ms <= 0:
+            raise ModelValidationError("funding_time_utc_ms must be a positive int")
+        if not isinstance(self.ts_utc_ms, int) or isinstance(self.ts_utc_ms, bool) or self.ts_utc_ms <= 0:
+            raise ModelValidationError("ts_utc_ms must be a positive int")
+
+    @classmethod
+    def from_okx(cls, row: Mapping[str, Any]) -> "FundingRate":
+        next_rate = row.get("nextFundingRate")
+        return cls(
+            inst_id=str(row.get("instId", "")),
+            funding_rate=parse_decimal(row.get("fundingRate", "0"), "fundingRate"),
+            next_funding_rate=parse_decimal(next_rate, "nextFundingRate") if next_rate is not None and str(next_rate).strip() != "" else None,
+            funding_time_utc_ms=parse_epoch_ms(row.get("fundingTime", row.get("ts")), "fundingTime"),
+            ts_utc_ms=parse_epoch_ms(row.get("ts"), "ts"),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "inst_id": self.inst_id,
+            "funding_rate": dec_str(self.funding_rate),
+            "next_funding_rate": dec_str(self.next_funding_rate) if self.next_funding_rate is not None else None,
+            "funding_time_utc_ms": self.funding_time_utc_ms,
+            "ts_utc_ms": self.ts_utc_ms,
         }
 
 

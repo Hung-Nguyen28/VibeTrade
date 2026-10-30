@@ -29,6 +29,7 @@
     "total_unrealized_pnl_usdt": { "$ref": "#/$defs/dec_signed" },
     "total_fees_paid_usdt": { "$ref": "#/$defs/dec_nonneg" },
     "total_schedule_drift_cost_usdt": { "$ref": "#/$defs/dec_signed" },
+    "total_funding_fees_usdt": { "$ref": "#/$defs/dec_signed" },
     "open_positions": {
       "type": "array",
       "items": { "$ref": "#/$defs/open_position" }
@@ -43,7 +44,7 @@
     }
   },
   "$defs": {
-    "inst_id": { "type": "string", "pattern": "^[A-Z0-9]+-USDT$" },
+    "inst_id": { "type": "string", "pattern": "^[A-Z0-9]+-USDT(-SWAP)?$" },
     "dec_pos": {
       "type": "string",
       "pattern": "^(?=[0-9.]*[1-9])[0-9]+(?:\\.[0-9]+)?$",
@@ -84,8 +85,13 @@
         "position_id": { "type": "string", "minLength": 1 },
         "inst_id": { "$ref": "#/$defs/inst_id" },
         "entry_order_id": { "type": "string", "minLength": 1 },
+        "side": { "enum": ["LONG", "SHORT", "BUY", "SELL"] },
         "entry_price": { "$ref": "#/$defs/dec_pos" },
         "qty_base": { "$ref": "#/$defs/dec_pos" },
+        "contracts": { "$ref": "#/$defs/dec_pos" },
+        "ct_val": { "$ref": "#/$defs/dec_pos" },
+        "leverage": { "$ref": "#/$defs/dec_pos" },
+        "isolated_margin_usdt": { "$ref": "#/$defs/dec_nonneg" },
         "notional_entry_usdt": { "$ref": "#/$defs/dec_pos" },
         "entry_fee_usdt": { "$ref": "#/$defs/dec_nonneg" },
         "candle_close_time": { "$ref": "#/$defs/epoch_ms" },
@@ -95,6 +101,10 @@
         "schedule_drift_bps": { "$ref": "#/$defs/dec_signed" },
         "schedule_drift_cost_usdt": { "$ref": "#/$defs/dec_signed" },
         "current_mark_price": { "$ref": "#/$defs/dec_pos" },
+        "liquidation_price": { "$ref": "#/$defs/dec_pos" },
+        "stop_loss_price": { "$ref": "#/$defs/dec_pos" },
+        "take_profit_price": { "$ref": "#/$defs/dec_pos" },
+        "accumulated_funding_usdt": { "$ref": "#/$defs/dec_signed" },
         "unrealized_pnl_usdt": { "$ref": "#/$defs/dec_signed" }
       }
     },
@@ -121,6 +131,7 @@
         "trade_id": { "type": "string", "minLength": 1 },
         "position_id": { "type": "string", "minLength": 1 },
         "inst_id": { "$ref": "#/$defs/inst_id" },
+        "side": { "enum": ["LONG", "SHORT", "BUY", "SELL"] },
         "entry_price": { "$ref": "#/$defs/dec_pos" },
         "exit_price": { "$ref": "#/$defs/dec_pos" },
         "qty_base": { "$ref": "#/$defs/dec_pos" },
@@ -132,7 +143,7 @@
         "entry_timestamp": { "$ref": "#/$defs/epoch_ms" },
         "exit_timestamp": { "$ref": "#/$defs/epoch_ms" },
         "exit_reason": {
-          "enum": ["TAKE_PROFIT", "STOP_LOSS", "TIME_STOP", "SIGNAL_EXIT"]
+          "enum": ["TAKE_PROFIT", "STOP_LOSS", "TIME_STOP", "SIGNAL_EXIT", "LIQUIDATED"]
         }
       }
     },
@@ -153,7 +164,7 @@
         "order_id": { "type": "string", "minLength": 1 },
         "signal_id": { "type": "string", "minLength": 1 },
         "inst_id": { "$ref": "#/$defs/inst_id" },
-        "side": { "enum": ["BUY", "SELL"] },
+        "side": { "enum": ["BUY", "SELL", "LONG", "SHORT"] },
         "proposed_notional_usdt": { "$ref": "#/$defs/dec_pos" },
         "constraint_code": { "type": "string", "minLength": 1 },
         "details": { "type": "string", "minLength": 1 },

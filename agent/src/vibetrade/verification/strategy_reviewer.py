@@ -91,14 +91,16 @@ class StrategyReviewer:
 
         # 3. Verdict threshold consistency
         expected_verdict: str
-        if recalculated_bear >= self.bear_veto_threshold:
-            expected_verdict = "AVOID_BEARISH"
-        elif recalculated_net >= self.actionable_net_threshold and recalculated_bear <= self.max_bear_risk_threshold:
+        if recalculated_net >= self.actionable_net_threshold and recalculated_bear <= self.max_bear_risk_threshold:
             expected_verdict = "ACTIONABLE_LONG"
+        elif recalculated_raw <= -self.actionable_net_threshold and recalculated_bull <= self.max_bear_risk_threshold:
+            expected_verdict = "ACTIONABLE_SHORT"
+        elif recalculated_bear >= self.bear_veto_threshold:
+            expected_verdict = "AVOID_BEARISH"
         elif recalculated_net > Decimal("0.00"):
             expected_verdict = "WATCHLIST_NEUTRAL"
         else:
-            expected_verdict = "AVOID_BEARISH"
+            expected_verdict = "WATCHLIST_NEUTRAL"
 
         if report.verdict != expected_verdict:
             violations.append(f"VERDICT_THRESHOLD_BREACH (expected={expected_verdict} vs actual={report.verdict})")

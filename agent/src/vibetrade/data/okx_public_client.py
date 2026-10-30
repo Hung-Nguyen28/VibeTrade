@@ -28,6 +28,9 @@ from src.vibetrade.data.bar_close import BAR_DURATION_MS, filter_closed_rows, ut
 from src.vibetrade.data.okx_models import (
     QUOTE_CCY,
     ClosedCandle,
+    FundingRate,
+    FuturesInstrumentRule,
+    MarkPrice,
     ModelValidationError,
     OrderBookLiquiditySnapshot,
     SpotInstrumentRule,
@@ -47,6 +50,8 @@ ALLOWED_PATHS: frozenset[str] = frozenset(
         "/market/candles",
         "/market/history-candles",
         "/market/books",
+        "/public/mark-price",
+        "/public/funding-rate",
     }
 )
 
@@ -164,17 +169,26 @@ class OKXPublicClient:
         raise OKXPublicError(f"OKX {path} failed after {self._max_retries + 1} attempts: {last_error}")
 
     # ------------------------------------------------------------- endpoints
-    def get_spot_instruments(
-        self, *, live_only: bool = True, exclude_stablecoin_pairs: bool = True
+    def get_instruments(
+        self,
+        inst_type: str = "SWAP",
+        *,
+        live_only: bool = True,
+        exclude_stablecoin_pairs: bool = True,
     ) -> tuple[SpotInstrumentRule, ...]:
-        """``GET /public/instruments?instType=SPOT`` -> live ``*-USDT`` rules."""
-        rows = self._get("/public/instruments", {"instType": "SPOT"})
+        """``GET /public/instruments?instType=...`` -> live USDT Spot or Perpetual Futures rules."""
+        rows = self._get("/public/instruments", {"instType": inst_type})
         rules: list[SpotInstrumentRule] = []
         for row in rows:
             if not isinstance(row, dict):
                 raise OKXPublicError("instruments: row is not an object")
-            if str(row.get("quoteCcy", "")) != QUOTE_CCY:
-                continue  # non-USDT quote: out of universe, not an error
+            quote = str(row.get("quoteCcy") or row.get("settleCcy") or "")
+            if quote != QUOTE_CCY:
+                continue  # non-USDT settle/quote: out of universe
+            if inst_type == "SWAP":
+                ct_type = str(row.get("ctType", ""))
+                if ct_type and ct_type != "linear":
+                    continue
             if live_only and str(row.get("state", "")) != "live":
                 continue
             rules.append(SpotInstrumentRule.from_okx(row))
@@ -183,21 +197,79 @@ class OKXPublicClient:
         kept = [r for r in rules if not (exclude_stablecoin_pairs and is_stablecoin_pair(r))]
         return tuple(sorted(kept, key=lambda r: r.inst_id))
 
-    def get_spot_tickers(self) -> TickersResult:
-        """``GET /market/tickers?instType=SPOT`` -> ``*-USDT`` tickers in ONE request."""
-        rows = self._get("/market/tickers", {"instType": "SPOT"})
+    def get_spot_instruments(
+        self, *, live_only: bool = True, exclude_stablecoin_pairs: bool = True
+    ) -> tuple[SpotInstrumentRule, ...]:
+        """Backward-compatible shortcut for ``GET /public/instruments?instType=SPOT``."""
+        return self.get_instruments("SPOT", live_only=live_only, exclude_stablecoin_pairs=exclude_stablecoin_pairs)
+
+    def get_futures_instruments(
+        self, *, live_only: bool = True, exclude_stablecoin_pairs: bool = True
+    ) -> tuple[SpotInstrumentRule, ...]:
+        """Shortcut for ``GET /public/instruments?instType=SWAP``."""
+        return self.get_instruments("SWAP", live_only=live_only, exclude_stablecoin_pairs=exclude_stablecoin_pairs)
+
+    def get_tickers(self, inst_type: str = "SWAP") -> TickersResult:
+        """``GET /market/tickers?instType=...`` -> tickers in ONE request."""
+        rows = self._get("/market/tickers", {"instType": inst_type})
         tickers: list[SpotTicker24h] = []
         skipped = 0
+        expected_suffix = f"-{QUOTE_CCY}-SWAP" if inst_type == "SWAP" else f"-{QUOTE_CCY}"
         for row in rows:
-            if not isinstance(row, dict) or not str(row.get("instId", "")).endswith(f"-{QUOTE_CCY}"):
+            if not isinstance(row, dict):
+                continue
+            inst_id = str(row.get("instId", ""))
+            if not (inst_id.endswith(expected_suffix) or (inst_type == "SWAP" and inst_id.endswith("-SWAP") and f"-{QUOTE_CCY}-" in inst_id)):
                 continue
             try:
                 tickers.append(SpotTicker24h.from_okx(row))
             except ModelValidationError as exc:
                 skipped += 1
                 logger.debug("ticker %s skipped: %s", row.get("instId"), exc)
+            except Exception as exc:
+                skipped += 1
+                logger.debug("ticker %s parse error: %s", row.get("instId"), exc)
         tickers.sort(key=lambda t: t.inst_id)
         return TickersResult(tickers=tuple(tickers), skipped=skipped)
+
+    def get_spot_tickers(self) -> TickersResult:
+        """Backward-compatible shortcut for ``GET /market/tickers?instType=SPOT``."""
+        return self.get_tickers("SPOT")
+
+    def get_futures_tickers(self) -> TickersResult:
+        """Shortcut for ``GET /market/tickers?instType=SWAP``."""
+        return self.get_tickers("SWAP")
+
+    def get_mark_prices(self, inst_type: str = "SWAP") -> tuple[MarkPrice, ...]:
+        """``GET /public/mark-price?instType=SWAP`` -> mark prices for USDT futures."""
+        rows = self._get("/public/mark-price", {"instType": inst_type})
+        marks: list[MarkPrice] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            inst_id = str(row.get("instId", ""))
+            if not (inst_id.endswith(f"-{QUOTE_CCY}-SWAP") or inst_id.endswith(f"-{QUOTE_CCY}")):
+                continue
+            try:
+                marks.append(MarkPrice.from_okx(row))
+            except Exception as exc:
+                logger.debug("mark price %s skipped: %s", inst_id, exc)
+        marks.sort(key=lambda m: m.inst_id)
+        return tuple(marks)
+
+    def get_mark_price(self, inst_id: str) -> MarkPrice:
+        """``GET /public/mark-price?instId=...`` -> single instrument mark price."""
+        rows = self._get("/public/mark-price", {"instId": inst_id})
+        if not rows or not isinstance(rows[0], dict):
+            raise OKXPublicError(f"mark-price {inst_id}: empty response")
+        return MarkPrice.from_okx(rows[0])
+
+    def get_funding_rate(self, inst_id: str) -> FundingRate:
+        """``GET /public/funding-rate?instId=...`` -> current and next funding rate."""
+        rows = self._get("/public/funding-rate", {"instId": inst_id})
+        if not rows or not isinstance(rows[0], dict):
+            raise OKXPublicError(f"funding-rate {inst_id}: empty response")
+        return FundingRate.from_okx(rows[0])
 
     def get_closed_candles(
         self,

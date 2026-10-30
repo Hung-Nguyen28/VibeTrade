@@ -125,8 +125,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "seed-sample-state":
         target = Path(args.state_dir)
-        runner = StatelessCycleRunner(state_dir=target)
-        res = runner.run_cycle(dry_run=True, trigger_anomaly_on="SOL-USDT")
+        runner = StatelessCycleRunner(
+            state_dir=target,
+            symbols=("BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "DOGE-USDT-SWAP", "AVAX-USDT-SWAP"),
+        )
+        res = runner.run_cycle(dry_run=True, trigger_anomaly_on="SOL-USDT-SWAP")
         if res.status == "HEALTHY":
             print(f"[vibetrade] Successfully seeded sample 5-file state at {target} (run_id={res.run_id})")
             return 0
@@ -164,11 +167,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         symbols = args.symbols if args.symbols else None
         runner = StatelessCycleRunner(
             state_dir=target,
-            symbols=symbols if symbols else ("BTC-USDT", "ETH-USDT", "SOL-USDT", "DOGE-USDT", "AVAX-USDT"),
+            symbols=symbols if symbols else ("BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "DOGE-USDT-SWAP", "AVAX-USDT-SWAP"),
         )
         res = runner.run_cycle(
             dry_run=args.dry_run or args.seed_sample_state,
-            trigger_anomaly_on="SOL-USDT",
+            trigger_anomaly_on="SOL-USDT-SWAP",
         )
         print(f"[vibetrade] Cycle run completed: status={res.status}, duration={res.duration_ms}ms, state_changed={res.state_changed}")
         print(f"            Scanned: {res.scanned_symbols_count}, Focus: {res.focus_sessions_count}, Executed: {res.orders_executed_count}, Rejected: {res.orders_rejected_count}")

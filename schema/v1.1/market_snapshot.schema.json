@@ -10,7 +10,7 @@
     "schema_version": { "const": "1.1" },
     "generated_at_utc_ms": { "type": "integer", "exclusiveMinimum": 0 },
     "source": { "const": "okx_public_v5" },
-    "inst_type": { "const": "SPOT" },
+    "inst_type": { "enum": ["SPOT", "SWAP"] },
     "quote_ccy": { "const": "USDT" },
     "instruments": { "type": "array", "items": { "$ref": "#/$defs/instrument" } },
     "tickers": { "type": "array", "items": { "$ref": "#/$defs/ticker" } },
@@ -18,7 +18,7 @@
     "orderbooks": { "type": "array", "items": { "$ref": "#/$defs/orderbook" } }
   },
   "$defs": {
-    "inst_id": { "type": "string", "pattern": "^[A-Z0-9]+-USDT$" },
+    "inst_id": { "type": "string", "pattern": "^[A-Z0-9]+-USDT(-SWAP)?$" },
     "dec_pos": { "type": "string", "pattern": "^(?=[0-9.]*[1-9])[0-9]+(?:\\.[0-9]+)?$", "description": "Finite decimal string, plain notation, strictly > 0." },
     "dec_nonneg": { "type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+)?$" },
     "dec_signed": { "type": "string", "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$" },
@@ -35,7 +35,12 @@
         "tick_size": { "$ref": "#/$defs/dec_pos" },
         "lot_size": { "$ref": "#/$defs/dec_pos" },
         "min_size": { "$ref": "#/$defs/dec_pos" },
-        "state": { "type": "string", "minLength": 1 }
+        "state": { "type": "string", "minLength": 1 },
+        "ct_val": { "$ref": "#/$defs/dec_pos" },
+        "ct_mult": { "$ref": "#/$defs/dec_pos" },
+        "max_lever": { "$ref": "#/$defs/dec_pos" },
+        "ct_type": { "type": "string" },
+        "settle_ccy": { "type": "string" }
       }
     },
     "ticker": {

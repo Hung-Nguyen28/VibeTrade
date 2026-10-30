@@ -30,7 +30,16 @@ VALID_STATUSES: frozenset[str] = frozenset(
     {"PENDING", "IN_FOCUS", "EVALUATED", "EXPIRED"}
 )
 VALID_ANOMALIES: frozenset[str] = frozenset(
-    {"VOLUME_SPIKE", "VOLATILITY_EXPANSION", "BREAKOUT", "MOMENTUM_SHIFT"}
+    {
+        "VOLUME_SPIKE",
+        "VOLATILITY_EXPANSION",
+        "BREAKOUT",
+        "MOMENTUM_SHIFT",
+        "BULLISH_BREAKOUT",
+        "BULLISH_MOMENTUM",
+        "BEARISH_BREAKDOWN",
+        "BEARISH_MOMENTUM",
+    }
 )
 VALID_TIMEFRAMES: frozenset[str] = frozenset(BAR_DURATION_MS.keys())
 

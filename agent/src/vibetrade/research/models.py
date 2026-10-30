@@ -27,7 +27,7 @@ from src.vibetrade.scanner.models import (
 SCHEMA_VERSION = "1.1"
 
 VALID_VERDICTS: frozenset[str] = frozenset(
-    {"ACTIONABLE_LONG", "WATCHLIST_NEUTRAL", "AVOID_BEARISH", "INCONCLUSIVE"}
+    {"ACTIONABLE_LONG", "ACTIONABLE_SHORT", "WATCHLIST_NEUTRAL", "AVOID_BEARISH", "INCONCLUSIVE"}
 )
 VALID_PERSONAS: frozenset[str] = frozenset({"bull_researcher", "bear_researcher"})
 

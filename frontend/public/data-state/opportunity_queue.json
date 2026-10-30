@@ -3,12 +3,14 @@
     {
       "anomaly_types": [
         "BREAKOUT",
+        "BULLISH_BREAKOUT",
+        "BULLISH_MOMENTUM",
         "MOMENTUM_SHIFT",
         "VOLUME_SPIKE"
       ],
-      "candle_close_time": 1793357100000,
-      "detected_at_utc_ms": 1793357771254,
-      "inst_id": "SOL-USDT",
+      "candle_close_time": 1793371500000,
+      "detected_at_utc_ms": 1793372357966,
+      "inst_id": "SOL-USDT-SWAP",
       "metrics": {
         "atr": "1.6278",
         "bar_range": "1.554",
@@ -20,12 +22,12 @@
       },
       "regime": "BULL_TREND",
       "scanner_score": "66.00",
-      "signal_id": "SOL-USDT:15m:1793357100000",
+      "signal_id": "SOL-USDT-SWAP:15m:1793371500000",
       "status": "EVALUATED",
       "timeframe": "15m"
     }
   ],
-  "generated_at_utc_ms": 1793357771254,
+  "generated_at_utc_ms": 1793372357966,
   "market_regime": {
     "btc_atr_pct": "1.0090",
     "btc_ema_fast": "71083.55",
@@ -38,7 +40,7 @@
       "is_ema_bear": false,
       "is_ema_bull": true
     },
-    "detected_at_utc_ms": 1793357771254,
+    "detected_at_utc_ms": 1793372357966,
     "market_breadth_pct": "100.00",
     "multiplier": "1.10",
     "regime": "BULL_TREND"

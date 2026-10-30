@@ -174,7 +174,18 @@ export function Overview() {
                     className="p-3.5 rounded-lg border border-border/50 bg-background/50 space-y-2 text-xs"
                   >
                     <div className="flex items-center justify-between font-mono">
-                      <span className="font-bold text-sm text-foreground">{pos.inst_id}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-foreground">{pos.inst_id}</span>
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            (pos.side || "LONG") === "LONG"
+                              ? "bg-emerald-500/20 text-emerald-400"
+                              : "bg-rose-500/20 text-rose-400"
+                          }`}
+                        >
+                          {pos.side || "LONG"} {pos.leverage || "3"}x
+                        </span>
+                      </div>
                       <span
                         className={`font-semibold tabular-nums ${
                           uPnl >= 0 ? "text-emerald-400" : "text-rose-400"
@@ -193,6 +204,11 @@ export function Overview() {
                       <div>
                         Mark: <span className="text-foreground">${pos.current_mark_price}</span>
                       </div>
+                      {pos.liquidation_price && (
+                        <div>
+                          Liq: <span className="text-amber-400 font-bold">${pos.liquidation_price}</span>
+                        </div>
+                      )}
                       <div>
                         Notional: <span className="text-foreground">${pos.notional_entry_usdt}</span>
                       </div>

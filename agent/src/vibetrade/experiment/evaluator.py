@@ -99,8 +99,11 @@ class ExperimentEvaluator:
                     from src.vibetrade.data.okx_public_client import OKXPublicClient
 
                     client = OKXPublicClient()
-                    tickers_resp = client.get_spot_tickers()
-                    btc_tk = next((t for t in tickers_resp.tickers if t.inst_id == "BTC-USDT"), None)
+                    tickers_resp = client.get_tickers(inst_type="SWAP")
+                    btc_tk = next((t for t in tickers_resp.tickers if t.inst_id in {"BTC-USDT-SWAP", "BTC-USDT"}), None)
+                    if not btc_tk:
+                        tickers_resp_spot = client.get_spot_tickers()
+                        btc_tk = next((t for t in tickers_resp_spot.tickers if t.inst_id == "BTC-USDT"), None)
                     p0_btc = btc_tk.last if btc_tk else Decimal("68000.00")
                 except Exception:
                     p0_btc = Decimal("71506.43")
@@ -128,6 +131,7 @@ class ExperimentEvaluator:
             "cumulative_realized_pnl_usdt": "0.00000000",
             "total_unrealized_pnl_usdt": "0.00000000",
             "total_fees_paid_usdt": "0.00000000",
+            "total_funding_fees_usdt": "0.00000000",
             "total_schedule_drift_cost_usdt": "0.00000000",
             "open_positions": [],
             "closed_trades": [],
@@ -188,7 +192,7 @@ class ExperimentEvaluator:
         if btc_now is None:
             # Check market_doc tickers
             tickers = market_doc.get("tickers", [])
-            btc_tk = next((t for t in tickers if t.get("inst_id") == "BTC-USDT"), None)
+            btc_tk = next((t for t in tickers if t.get("inst_id") in {"BTC-USDT-SWAP", "BTC-USDT"}), None)
             if btc_tk and btc_tk.get("last"):
                 btc_now = Decimal(str(btc_tk["last"]))
             elif queue_doc.get("market_regime", {}).get("btc_price"):

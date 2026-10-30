@@ -35,6 +35,10 @@ export interface InstrumentInfo {
   lot_size: string;
   min_size: string;
   state: string;
+  ct_val?: string;
+  ct_mult?: string;
+  max_lever?: string;
+  settle_ccy?: string;
 }
 
 export interface TickerInfo {
@@ -139,9 +143,18 @@ export interface OpportunityQueueSnapshot {
 export interface OpenPosition {
   position_id: string;
   inst_id: string;
+  side?: "LONG" | "SHORT" | string;
   qty_base: string;
+  contracts?: string;
+  ct_val?: string;
+  leverage?: string;
+  isolated_margin_usdt?: string;
   entry_price: string;
   current_mark_price: string;
+  liquidation_price?: string;
+  stop_loss_price?: string;
+  take_profit_price?: string;
+  accumulated_funding_usdt?: string;
   notional_entry_usdt: string;
   entry_fee_usdt: string;
   candle_close_time: number;
@@ -156,24 +169,37 @@ export interface OpenPosition {
 
 export interface ClosedTrade {
   trade_id: string;
+  position_id?: string;
   inst_id: string;
+  side?: "LONG" | "SHORT" | string;
   qty_base: string;
   entry_price: string;
   exit_price: string;
-  realized_pnl_usdt: string;
-  total_fees_usdt: string;
-  entry_time: number;
-  exit_time: number;
-  exit_reason?: string;
+  realized_pnl_usdt?: string;
+  net_realized_pnl_usdt?: string;
+  gross_pnl_usdt?: string;
+  total_fees_usdt?: string;
+  entry_fee_usdt?: string;
+  exit_fee_usdt?: string;
+  entry_time?: number;
+  exit_time?: number;
+  entry_timestamp?: number;
+  exit_timestamp?: number;
+  exit_reason?: "TAKE_PROFIT" | "STOP_LOSS" | "TIME_STOP" | "SIGNAL_EXIT" | "LIQUIDATED" | string;
   schedule_drift_cost_usdt?: string;
 }
 
 export interface RejectedOrder {
   order_id: string;
+  signal_id?: string;
   inst_id: string;
-  reason: string;
-  rejected_at_utc_ms: number;
-  details?: Record<string, unknown>;
+  side?: string;
+  proposed_notional_usdt?: string;
+  constraint_code?: string;
+  reason?: string;
+  timestamp_ms?: number;
+  rejected_at_utc_ms?: number;
+  details?: Record<string, unknown> | string;
 }
 
 export interface PaperPortfolioSnapshot {
@@ -186,6 +212,7 @@ export interface PaperPortfolioSnapshot {
   total_unrealized_pnl_usdt: string;
   total_fees_paid_usdt: string;
   total_schedule_drift_cost_usdt: string;
+  total_funding_fees_usdt?: string;
   open_positions: OpenPosition[];
   closed_trades: ClosedTrade[];
   rejected_orders: RejectedOrder[];
@@ -210,7 +237,7 @@ export interface ResearchReport {
   timeframe: string;
   candle_close_time: number;
   evaluated_at_utc_ms: number;
-  verdict: "ACTIONABLE_LONG" | "INCONCLUSIVE" | "NO_ACTION" | string;
+  verdict: "ACTIONABLE_LONG" | "ACTIONABLE_SHORT" | "WATCHLIST_NEUTRAL" | "AVOID_BEARISH" | "INCONCLUSIVE" | string;
   score_bull: string;
   score_bear: string;
   score_raw: string;

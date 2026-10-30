@@ -135,23 +135,37 @@ def scan_instrument_anomalies(
         anomalies.append("VOLATILITY_EXPANSION")
         volatility_score = min(cur_range / (2.0 * cur_atr), 1.0) * 25.0
 
-    # 3. Breakout (Local resistance breakout over prior 20 closed bars)
+    # 3. Breakout / Breakdown (Local 20-bar resistance breakout or support breakdown)
     lookback = min(cfg.breakout_lookback, len(frame) - 1)
     if lookback >= 5:
         prior_highs = high.iloc[-lookback - 1 : -1]
         prior_max_high = float(prior_highs.max())
+        prior_lows = low.iloc[-lookback - 1 : -1]
+        prior_min_low = float(prior_lows.min())
+
         if cur_close > prior_max_high and cur_close > cur_open:
-            anomalies.append("BREAKOUT")
+            anomalies.extend(["BREAKOUT", "BULLISH_BREAKOUT"])
+            breakout_score = 25.0
+        elif cur_close < prior_min_low and cur_close < cur_open:
+            anomalies.append("BEARISH_BREAKDOWN")
             breakout_score = 25.0
 
-    # 4. Momentum Shift (RSI rising above threshold and fast EMA > slow EMA)
-    is_momentum_shift = (
+    # 4. Momentum Shift (Bullish or Bearish)
+    is_bullish_momentum = (
         (cur_rsi >= cfg.rsi_momentum_threshold)
         and (cur_rsi > prev_rsi)
         and (cur_ema_fast > cur_ema_slow)
     )
-    if is_momentum_shift:
-        anomalies.append("MOMENTUM_SHIFT")
+    is_bearish_momentum = (
+        (cur_rsi <= (100.0 - cfg.rsi_momentum_threshold))
+        and (cur_rsi < prev_rsi)
+        and (cur_ema_fast < cur_ema_slow)
+    )
+    if is_bullish_momentum:
+        anomalies.extend(["MOMENTUM_SHIFT", "BULLISH_MOMENTUM"])
+        momentum_score = 15.0
+    elif is_bearish_momentum:
+        anomalies.append("BEARISH_MOMENTUM")
         momentum_score = 15.0
 
     if not anomalies:

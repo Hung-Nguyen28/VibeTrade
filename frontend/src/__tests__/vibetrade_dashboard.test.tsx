@@ -92,13 +92,14 @@ describe("Phase P7-B: 7-Screen Quant Dashboard UI Rendering", () => {
       </MemoryRouter>
     );
 
+    const expEquity = formatUsdt(safeNumber(paperPortfolioFixture.total_equity_usdt), 4);
     expect(screen.getByText("Overview")).toBeInTheDocument();
     expect(screen.getByText("Total Equity")).toBeInTheDocument();
-    expect(screen.getByText("$9.9985")).toBeInTheDocument();
+    expect(screen.getByText(expEquity)).toBeInTheDocument();
     expect(screen.getByText("Realized PnL:")).toBeInTheDocument();
     expect(screen.getByText("Unrealized PnL:")).toBeInTheDocument();
-    expect(screen.getByText("BULL_TREND")).toBeInTheDocument();
-    expect(screen.getAllByText("SOL-USDT").length).toBeGreaterThan(0);
+    expect(screen.getByText(opportunityQueueFixture.market_regime.regime)).toBeInTheDocument();
+    expect(screen.getAllByText(paperPortfolioFixture.open_positions[0].inst_id).length).toBeGreaterThan(0);
   });
 
   it("Screen 2 (Market Scanner) renders OKX Spot pairs, search filter, and spreads", () => {
@@ -109,15 +110,17 @@ describe("Phase P7-B: 7-Screen Quant Dashboard UI Rendering", () => {
     );
 
     expect(screen.getByText("Market Scanner")).toBeInTheDocument();
-    expect(screen.getByText("5 USDT Spot")).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`${marketSnapshotFixture.tickers.length} USDT`, "i"))).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Search symbol/i)).toBeInTheDocument();
-    expect(screen.getAllByText("AVAX-USDT").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("SOL-USDT").length).toBeGreaterThan(0);
+    const firstSym = marketSnapshotFixture.tickers[0].inst_id;
+    const lastSym = marketSnapshotFixture.tickers[marketSnapshotFixture.tickers.length - 1].inst_id;
+    expect(screen.getAllByText(firstSym).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(lastSym).length).toBeGreaterThan(0);
 
     // Search filter test
     const input = screen.getByPlaceholderText(/Search symbol/i);
     fireEvent.change(input, { target: { value: "SOL" } });
-    expect(screen.getAllByText("SOL-USDT").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/SOL-USDT(-SWAP)?/).length).toBeGreaterThan(0);
     expect(screen.queryByText("AVAX-USDT")).not.toBeInTheDocument();
   });
 
@@ -129,11 +132,11 @@ describe("Phase P7-B: 7-Screen Quant Dashboard UI Rendering", () => {
     );
 
     expect(screen.getByText("Opportunity Queue")).toBeInTheDocument();
-    expect(screen.getByText("Queue Size: 1")).toBeInTheDocument();
-    expect(screen.getByText("SOL-USDT:15m:1793357100000")).toBeInTheDocument();
-    expect(screen.getByText("66.00")).toBeInTheDocument();
-    expect(screen.getByText("BREAKOUT")).toBeInTheDocument();
-    expect(screen.getByText("VOLUME_SPIKE")).toBeInTheDocument();
+    expect(screen.getByText(`Queue Size: ${opportunityQueueFixture.candidates.length}`)).toBeInTheDocument();
+    const cand = opportunityQueueFixture.candidates[0];
+    expect(screen.getByText(cand.signal_id)).toBeInTheDocument();
+    expect(screen.getByText(cand.scanner_score)).toBeInTheDocument();
+    expect(screen.getByText(cand.anomaly_types[0])).toBeInTheDocument();
   });
 
   it("Screen 4 (AI Research Room) renders Bull/Bear weighted scores and Evidence Binding", () => {
@@ -159,9 +162,12 @@ describe("Phase P7-B: 7-Screen Quant Dashboard UI Rendering", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText("Paper Portfolio ($10 Account)")).toBeInTheDocument();
-    expect(screen.getByText("$9.9985")).toBeInTheDocument();
-    expect(screen.getByText("$8.4973")).toBeInTheDocument();
+    const expEquity = formatUsdt(safeNumber(paperPortfolioFixture.total_equity_usdt), 4);
+    const expCash = formatUsdt(safeNumber(paperPortfolioFixture.cash_balance_usdt), 4);
+
+    expect(screen.getByText(/Paper Portfolio/i)).toBeInTheDocument();
+    expect(screen.getByText(expEquity)).toBeInTheDocument();
+    expect(screen.getByText(expCash)).toBeInTheDocument();
     expect(screen.getByText("1. Candle Close:")).toBeInTheDocument();
     expect(screen.getByText("2. Signal Generated:")).toBeInTheDocument();
     expect(screen.getByText("3. Order Executed:")).toBeInTheDocument();
@@ -190,8 +196,8 @@ describe("Phase P7-B: 7-Screen Quant Dashboard UI Rendering", () => {
     );
 
     expect(screen.getByText("System Monitor & Telemetry")).toBeInTheDocument();
-    expect(screen.getByText("run:cycle:1793357771254")).toBeInTheDocument();
-    expect(screen.getByText("40 ms")).toBeInTheDocument();
+    expect(screen.getByText(heartbeatFixture.run_id)).toBeInTheDocument();
+    expect(screen.getByText(`${heartbeatFixture.duration_ms} ms`)).toBeInTheDocument();
     expect(screen.getByText("SHA-256 Snapshot Verification Hashes")).toBeInTheDocument();
     expect(screen.getByText("market_snapshot.json")).toBeInTheDocument();
     expect(screen.getAllByText("VERIFIED_MATCH").length).toBe(4);

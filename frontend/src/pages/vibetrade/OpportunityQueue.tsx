@@ -17,7 +17,7 @@ export function OpportunityQueue() {
             Opportunity Queue
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Idempotent Signals · Multi-factor Anomaly Triggers · Candidate Lifecycle
+            Idempotent Signals · Bidirectional Anomaly Triggers · Candidate Lifecycle
           </p>
         </div>
         <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
@@ -67,8 +67,8 @@ export function OpportunityQueue() {
           <Layers className="h-8 w-8 mx-auto text-muted-foreground/40" />
           <p className="text-sm font-semibold text-foreground">No Candidates in Queue</p>
           <p>
-            The scanner evaluates all USDT Spot pairs on every 15-minute candle close.
-            When breakout or volume anomalies occur, signals are queued here idempotently.
+            The scanner evaluates all USDT Perpetual Futures contracts on every 15-minute candle close.
+            When breakout or momentum anomalies occur, signals are queued here idempotently.
           </p>
         </div>
       ) : (

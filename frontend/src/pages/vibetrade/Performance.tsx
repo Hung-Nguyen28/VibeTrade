@@ -31,7 +31,9 @@ export function Performance() {
   const cashBaselineReturnPct = 0.0;
 
   // BTC Baseline (from BTC ticker in snapshot or opportunity_queue)
-  const btcTicker = marketSnapshot?.tickers?.find((t) => t.inst_id === "BTC-USDT");
+  const btcTicker = marketSnapshot?.tickers?.find(
+    (t) => t.inst_id === "BTC-USDT-SWAP" || t.inst_id === "BTC-USDT"
+  );
   const btcLast = safeNumber(btcTicker?.last, safeNumber(opportunityQueue?.market_regime?.btc_price, 71500));
   const btcOpen24h = safeNumber(btcTicker?.open_24h, btcLast);
   const btcChangePct = btcOpen24h > 0 ? ((btcLast - btcOpen24h) / btcOpen24h) * 100 : 0.0;

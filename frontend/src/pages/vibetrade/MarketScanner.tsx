@@ -84,7 +84,7 @@ export function MarketScanner() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Market Scanner</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            OKX Public REST v5 · USDT Spot Pairs · Micro-liquidity & Surveillance
+            OKX Public REST v5 · USDT Perpetual Futures (`*-USDT-SWAP`) · Micro-liquidity & Surveillance
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -104,8 +104,8 @@ export function MarketScanner() {
       {/* Summary KPI Ribbon */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
         <div className="rounded-lg border border-border/60 bg-card p-3 font-mono">
-          <span className="text-muted-foreground text-[11px]">Total Monitored Pairs</span>
-          <p className="text-lg font-bold text-foreground mt-1">{rows.length} USDT Spot</p>
+          <span className="text-muted-foreground text-[11px]">Total Monitored Instruments</span>
+          <p className="text-lg font-bold text-foreground mt-1">{rows.length} USDT Instruments</p>
         </div>
         <div className="rounded-lg border border-border/60 bg-card p-3 font-mono">
           <span className="text-muted-foreground text-[11px]">Average Spread</span>
@@ -251,7 +251,11 @@ export function MarketScanner() {
                           r.anomalies.map((anom: string) => (
                             <span
                               key={anom}
-                              className="px-1.5 py-0.5 rounded text-[10px] bg-primary/15 text-primary border border-primary/30"
+                              className={`px-1.5 py-0.5 rounded text-[10px] border ${
+                                anom.startsWith("BEARISH_")
+                                  ? "bg-rose-500/15 text-rose-400 border-rose-500/30"
+                                  : "bg-primary/15 text-primary border-primary/30"
+                              }`}
                             >
                               {anom}
                             </span>

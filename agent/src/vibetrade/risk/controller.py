@@ -23,6 +23,9 @@ DEFAULT_MAX_OPEN_POSITIONS = 3
 DEFAULT_MAX_PORTFOLIO_DRAWDOWN_PCT = Decimal("15.00")
 DEFAULT_MAX_ALLOWED_SPREAD_BPS = Decimal("25.00")
 DEFAULT_MAX_ALLOWED_SLIPPAGE_BPS = Decimal("12.00")
+DEFAULT_MAX_LEVERAGE = Decimal("3")
+DEFAULT_MAINTENANCE_MARGIN_RATE = Decimal("0.01")
+DEFAULT_MIN_LIQUIDATION_BUFFER_PCT = Decimal("0.02")
 
 
 @dataclass(frozen=True)
@@ -35,6 +38,10 @@ class RiskConfig:
     max_allowed_spread_bps: Decimal = DEFAULT_MAX_ALLOWED_SPREAD_BPS
     max_allowed_slippage_bps: Decimal = DEFAULT_MAX_ALLOWED_SLIPPAGE_BPS
     require_verification_pass: bool = True
+    max_leverage: Decimal = DEFAULT_MAX_LEVERAGE
+    margin_mode: str = "ISOLATED"
+    maintenance_margin_rate: Decimal = DEFAULT_MAINTENANCE_MARGIN_RATE
+    min_liquidation_buffer_pct: Decimal = DEFAULT_MIN_LIQUIDATION_BUFFER_PCT
 
     def __post_init__(self) -> None:
         if self.max_position_notional_usdt <= Decimal(0):
@@ -47,6 +54,10 @@ class RiskConfig:
             raise ValueError("max_allowed_spread_bps must be > 0")
         if self.max_allowed_slippage_bps <= Decimal(0):
             raise ValueError("max_allowed_slippage_bps must be > 0")
+        if self.max_leverage <= Decimal(0):
+            raise ValueError("max_leverage must be > 0")
+        if self.maintenance_margin_rate <= Decimal(0):
+            raise ValueError("maintenance_margin_rate must be > 0")
 
     @property
     def config_sha256(self) -> str:
@@ -56,7 +67,10 @@ class RiskConfig:
             f"{self.max_portfolio_drawdown_pct}:"
             f"{self.max_allowed_spread_bps}:"
             f"{self.max_allowed_slippage_bps}:"
-            f"{self.require_verification_pass}"
+            f"{self.require_verification_pass}:"
+            f"{self.max_leverage}:"
+            f"{self.margin_mode}:"
+            f"{self.maintenance_margin_rate}"
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -102,11 +116,11 @@ class ImmutableRiskController:
                     details=f"Receipt status is {receipt.status} with violations: {receipt.violations}",
                     config_hash=cfg_hash,
                 )
-            if report.verdict != "ACTIONABLE_LONG":
+            if report.verdict not in {"ACTIONABLE_LONG", "ACTIONABLE_SHORT"}:
                 return RiskDecision(
                     approved=False,
                     constraint_code="VERDICT_NOT_ACTIONABLE",
-                    details=f"Report verdict is {report.verdict}, expected ACTIONABLE_LONG",
+                    details=f"Report verdict is {report.verdict}, expected ACTIONABLE_LONG or ACTIONABLE_SHORT",
                     config_hash=cfg_hash,
                 )
 
@@ -146,12 +160,17 @@ class ImmutableRiskController:
                 config_hash=cfg_hash,
             )
 
-        # 6. Slippage Check
-        if orderbook.est_buy_slippage_bps is not None and orderbook.est_buy_slippage_bps > cfg.max_allowed_slippage_bps:
+        # 6. Slippage Check (directional)
+        slippage = (
+            orderbook.est_sell_slippage_bps
+            if report.verdict == "ACTIONABLE_SHORT"
+            else orderbook.est_buy_slippage_bps
+        )
+        if slippage is not None and slippage > cfg.max_allowed_slippage_bps:
             return RiskDecision(
                 approved=False,
                 constraint_code="SLIPPAGE_EXCEEDS_RISK_LIMIT",
-                details=f"Buy slippage {orderbook.est_buy_slippage_bps:.2f} bps > max {cfg.max_allowed_slippage_bps:.2f} bps",
+                details=f"Slippage {slippage:.2f} bps > max {cfg.max_allowed_slippage_bps:.2f} bps",
                 config_hash=cfg_hash,
             )
 

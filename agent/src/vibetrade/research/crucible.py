@@ -91,19 +91,27 @@ class CrucibleEngine:
 
         all_evidence: list[EvidenceItem] = list(bull_score.evidence) + list(bear_score.evidence)
 
+        is_futures = inst_id.endswith("-SWAP")
+
         # 3. Decision Matrix
-        if s_bear >= self.bear_veto_threshold:
+        if s_bear >= self.bear_veto_threshold and not is_futures:
             verdict = "AVOID_BEARISH"
-            reason = f"Bear risk score ({s_bear:.2f}) exceeded veto threshold ({self.bear_veto_threshold:.2f})"
+            reason = f"Bear risk score ({s_bear:.2f}) exceeded veto threshold ({self.bear_veto_threshold:.2f}) on Spot pair"
         elif s_net >= self.actionable_net_threshold and s_bear <= self.max_bear_risk_threshold:
             verdict = "ACTIONABLE_LONG"
             reason = f"Net score {s_net:+.2f} >= {self.actionable_net_threshold} and bear risk {s_bear:.2f} <= {self.max_bear_risk_threshold}"
+        elif is_futures and s_raw <= -self.actionable_net_threshold and s_bull <= self.max_bear_risk_threshold:
+            verdict = "ACTIONABLE_SHORT"
+            reason = f"Raw score {s_raw:+.2f} <= -{self.actionable_net_threshold} and bull risk {s_bull:.2f} <= {self.max_bear_risk_threshold}"
+        elif s_bear >= self.bear_veto_threshold:
+            verdict = "AVOID_BEARISH"
+            reason = f"Bear risk score ({s_bear:.2f}) exceeded veto threshold ({self.bear_veto_threshold:.2f})"
         elif s_net > Decimal("0.00"):
             verdict = "WATCHLIST_NEUTRAL"
             reason = f"Net score {s_net:+.2f} positive but below actionable threshold {self.actionable_net_threshold}"
         else:
-            verdict = "AVOID_BEARISH"
-            reason = f"Net score {s_net:+.2f} non-positive under regime {regime}"
+            verdict = "WATCHLIST_NEUTRAL"
+            reason = f"Net score {s_net:+.2f} non-actionable under regime {regime}"
 
         # 4. Evidence-based summary template
         summary = (

@@ -81,7 +81,7 @@ export function SystemMonitor() {
         {/* Scanned Symbols */}
         <div className="p-4 rounded-xl border border-border/60 bg-card space-y-1">
           <span className="text-[11px] text-muted-foreground flex items-center justify-between">
-            OKX Spot Scanned
+            OKX Instruments Scanned
             <Radio className="h-3.5 w-3.5 text-sky-400" />
           </span>
           <div className="text-xl font-bold text-foreground tabular-nums">

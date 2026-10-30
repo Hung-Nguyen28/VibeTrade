@@ -45,7 +45,7 @@ REGIME_MULTIPLIERS: dict[str, Decimal] = {
 class MarketRegimeConfig:
     """Configurable thresholds for market regime classification."""
 
-    btc_inst_id: str = "BTC-USDT"
+    btc_inst_id: str = "BTC-USDT-SWAP"
     fast_ema_span: int = 20
     slow_ema_span: int = 50
     rsi_period: int = 14
@@ -100,7 +100,7 @@ def detect_market_regime(
         )
 
     # Filter BTC candles and convert to causal DataFrame
-    btc_list = [c for c in btc_candles if c.inst_id == cfg.btc_inst_id]
+    btc_list = [c for c in btc_candles if c.inst_id in {cfg.btc_inst_id, "BTC-USDT-SWAP", "BTC-USDT"}]
     if not btc_list:
         btc_list = list(btc_candles)  # caller may pass pre-filtered btc list
 

@@ -35,6 +35,7 @@ class PaperPortfolio:
         cumulative_realized_pnl_usdt: Decimal = Decimal("0.00"),
         total_fees_paid_usdt: Decimal = Decimal("0.00"),
         total_schedule_drift_cost_usdt: Decimal = Decimal("0.00"),
+        total_funding_fees_usdt: Decimal = Decimal("0.00"),
     ) -> None:
         self.initial_balance_usdt = initial_balance_usdt
         self.cash_balance_usdt = cash_balance_usdt if cash_balance_usdt is not None else initial_balance_usdt
@@ -44,6 +45,7 @@ class PaperPortfolio:
         self.cumulative_realized_pnl_usdt = cumulative_realized_pnl_usdt
         self.total_fees_paid_usdt = total_fees_paid_usdt
         self.total_schedule_drift_cost_usdt = total_schedule_drift_cost_usdt
+        self.total_funding_fees_usdt = total_funding_fees_usdt
         self.peak_equity_usdt = max(self.initial_balance_usdt, self.total_equity_usdt)
 
     @property
@@ -68,7 +70,11 @@ class PaperPortfolio:
 
     @property
     def total_equity_usdt(self) -> Decimal:
-        return self.cash_balance_usdt + self.total_market_value_usdt
+        pos_equity = sum(
+            (p.isolated_margin_usdt + p.unrealized_pnl_usdt for p in self._open_positions.values()),
+            Decimal("0.00"),
+        )
+        return self.cash_balance_usdt + pos_equity
 
     @property
     def current_drawdown_pct(self) -> Decimal:
@@ -85,7 +91,7 @@ class PaperPortfolio:
         self._rejected_orders.append(record)
 
     def open_position(self, result: ExecutionResult) -> None:
-        """Apply a successful buy order execution to the portfolio."""
+        """Apply a successful order execution to the portfolio."""
         if not result.success or result.position is None:
             raise ValueError("Cannot open position from unsuccessful ExecutionResult")
         pos = result.position
@@ -108,23 +114,41 @@ class PaperPortfolio:
         exit_price: Decimal,
         exit_timestamp: int,
         exit_reason: str,
-        fee_rate: Decimal = Decimal("0.001"),
+        fee_rate: Decimal = Decimal("0.0005"),
     ) -> ClosedTradeRecord:
-        """Close an existing spot position, realizing PnL and applying exit fee."""
+        """Close an existing spot or futures position, realizing PnL and applying exit fee."""
         if inst_id not in self._open_positions:
             raise KeyError(f"No open position found for {inst_id}")
 
         pos = self._open_positions.pop(inst_id)
+        is_futures = pos.inst_id.endswith("-SWAP") or pos.leverage > Decimal("1")
         exit_notional = pos.qty_base * exit_price
-        exit_fee = exit_notional * fee_rate
-        net_cash_returned = exit_notional - exit_fee
 
-        self.cash_balance_usdt += net_cash_returned
-        self.total_fees_paid_usdt += exit_fee
+        if exit_reason == "LIQUIDATED":
+            # Liquidated: entire isolated margin is lost
+            exit_fee = Decimal("0.00000000")
+            gross_pnl = -pos.isolated_margin_usdt
+            net_realized_pnl = -pos.isolated_margin_usdt - pos.entry_fee_usdt
+            self.cumulative_realized_pnl_usdt += net_realized_pnl
+            # 0 cash returned
+        else:
+            exit_fee = exit_notional * fee_rate
+            self.total_fees_paid_usdt += exit_fee
 
-        gross_pnl = (exit_price - pos.entry_price) * pos.qty_base
-        net_realized_pnl = gross_pnl - pos.entry_fee_usdt - exit_fee
-        self.cumulative_realized_pnl_usdt += net_realized_pnl
+            if pos.side in {"SHORT", "SELL"}:
+                gross_pnl = (pos.entry_price - exit_price) * pos.qty_base
+            else:
+                gross_pnl = (exit_price - pos.entry_price) * pos.qty_base
+
+            net_realized_pnl = gross_pnl - pos.entry_fee_usdt - exit_fee
+            self.cumulative_realized_pnl_usdt += net_realized_pnl
+
+            if is_futures:
+                net_cash_returned = pos.isolated_margin_usdt + gross_pnl - exit_fee
+            else:
+                net_cash_returned = exit_notional - exit_fee
+
+            self.cash_balance_usdt += max(Decimal("0.00"), net_cash_returned)
 
         trade_id = f"trd:{inst_id}:{exit_timestamp}"
         record = ClosedTradeRecord(
@@ -142,6 +166,7 @@ class PaperPortfolio:
             entry_timestamp=pos.execution_timestamp,
             exit_timestamp=exit_timestamp,
             exit_reason=exit_reason,
+            side=pos.side,
         )
         self._closed_trades.append(record)
 
@@ -150,13 +175,69 @@ class PaperPortfolio:
 
         return record
 
+    def apply_funding_fee(
+        self,
+        inst_id: str,
+        funding_rate: Decimal,
+        timestamp_ms: int,
+    ) -> Decimal:
+        """Apply funding fee payment for an open position at a funding interval."""
+        if inst_id not in self._open_positions:
+            return Decimal("0.00")
+        pos = self._open_positions[inst_id]
+        notional = pos.qty_base * pos.current_mark_price
+
+        # Positive funding rate: Long pays Short, Short receives.
+        # Negative funding rate: Short pays Long, Long receives.
+        if pos.side in {"SHORT", "SELL"}:
+            fee_delta = -(notional * funding_rate)
+        else:
+            fee_delta = notional * funding_rate
+
+        self.cash_balance_usdt -= fee_delta
+        self.total_funding_fees_usdt += fee_delta
+        if fee_delta > Decimal(0):
+            self.total_fees_paid_usdt += fee_delta
+
+        new_accum = pos.accumulated_funding_usdt + fee_delta
+        self._open_positions[inst_id] = OpenPosition(
+            position_id=pos.position_id,
+            inst_id=pos.inst_id,
+            entry_order_id=pos.entry_order_id,
+            entry_price=pos.entry_price,
+            qty_base=pos.qty_base,
+            notional_entry_usdt=pos.notional_entry_usdt,
+            entry_fee_usdt=pos.entry_fee_usdt,
+            candle_close_time=pos.candle_close_time,
+            signal_timestamp=pos.signal_timestamp,
+            execution_timestamp=pos.execution_timestamp,
+            schedule_drift_ms=pos.schedule_drift_ms,
+            schedule_drift_bps=pos.schedule_drift_bps,
+            schedule_drift_cost_usdt=pos.schedule_drift_cost_usdt,
+            current_mark_price=pos.current_mark_price,
+            unrealized_pnl_usdt=pos.unrealized_pnl_usdt,
+            side=pos.side,
+            leverage=pos.leverage,
+            isolated_margin_usdt=pos.isolated_margin_usdt,
+            contracts=pos.contracts,
+            ct_val=pos.ct_val,
+            liquidation_price=pos.liquidation_price,
+            stop_loss_price=pos.stop_loss_price,
+            take_profit_price=pos.take_profit_price,
+            accumulated_funding_usdt=new_accum,
+        )
+        return fee_delta
+
     def update_mark_prices(self, mark_prices: Mapping[str, Decimal]) -> None:
         """Update mark-to-market prices for all open positions."""
         for inst_id, mark_px in mark_prices.items():
             if inst_id in self._open_positions:
                 pos = self._open_positions[inst_id]
-                unrealized = (mark_px - pos.entry_price) * pos.qty_base
-                # Create updated open position
+                if pos.side in {"SHORT", "SELL"}:
+                    unrealized = (pos.entry_price - mark_px) * pos.qty_base
+                else:
+                    unrealized = (mark_px - pos.entry_price) * pos.qty_base
+
                 self._open_positions[inst_id] = OpenPosition(
                     position_id=pos.position_id,
                     inst_id=pos.inst_id,
@@ -173,6 +254,15 @@ class PaperPortfolio:
                     schedule_drift_cost_usdt=pos.schedule_drift_cost_usdt,
                     current_mark_price=mark_px,
                     unrealized_pnl_usdt=unrealized,
+                    side=pos.side,
+                    leverage=pos.leverage,
+                    isolated_margin_usdt=pos.isolated_margin_usdt,
+                    contracts=pos.contracts,
+                    ct_val=pos.ct_val,
+                    liquidation_price=pos.liquidation_price,
+                    stop_loss_price=pos.stop_loss_price,
+                    take_profit_price=pos.take_profit_price,
+                    accumulated_funding_usdt=pos.accumulated_funding_usdt,
                 )
 
         if self.total_equity_usdt > self.peak_equity_usdt:
@@ -193,4 +283,5 @@ class PaperPortfolio:
             open_positions=tuple(sorted(self._open_positions.values(), key=lambda p: p.inst_id)),
             closed_trades=tuple(sorted(self._closed_trades, key=lambda t: (-t.exit_timestamp, t.trade_id))),
             rejected_orders=tuple(sorted(self._rejected_orders, key=lambda r: (-r.timestamp_ms, r.order_id))),
+            total_funding_fees_usdt=self.total_funding_fees_usdt,
         )

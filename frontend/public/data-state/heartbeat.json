@@ -1,21 +1,21 @@
 {
-  "cycle_finished_at_utc_ms": 1793357771294,
-  "cycle_started_at_utc_ms": 1793357771254,
+  "cycle_finished_at_utc_ms": 1793372358006,
+  "cycle_started_at_utc_ms": 1793372357966,
   "duration_ms": 40,
   "error_summary": null,
-  "focus_sessions_triggered": 1,
+  "focus_sessions_triggered": 0,
   "okx_api_status": "MOCK",
-  "orders_executed_count": 1,
+  "orders_executed_count": 0,
   "orders_rejected_count": 0,
-  "run_id": "run:cycle:1793357771254",
+  "run_id": "run:cycle:1793372357966",
   "scanned_symbols_count": 5,
   "schedule_drift_ms": 0,
   "schema_version": "1.1",
   "snapshot_hashes": {
-    "market_snapshot_sha256": "f8a790a0a1ee8cfdb17e4544980a544defe926f57760234124e03857a68303eb",
-    "opportunity_queue_sha256": "05de3945aaac7aa5ae5e3a24f0de13bc6105713b852ddd0da42f50e8970e406f",
-    "paper_portfolio_sha256": "a187829a58a4e580ef4adfa584df7cf8e94b469ee7d4ca61facc9a0d616d7e84",
-    "research_history_sha256": "bbfae9c25a6cc0f38f5e53862d82433da98e2c8ffa01d291caf6fe91904d58b6"
+    "market_snapshot_sha256": "19723753582ed694bedb5d16daa51f5ec97f522f39b084c84d5807c0d766f170",
+    "opportunity_queue_sha256": "592bac5b065399ebe54d8fdd05c2ad0cc34282467c670cfbfa44323ff796d65b",
+    "paper_portfolio_sha256": "1f0454e9214df71f0d2a2b32b1a5b9fbd891dbed80f949ece862d9f63406b723",
+    "research_history_sha256": "4139843620907aba5f2257624cce020e78b010eaa3d4aeca533a32724d616370"
   },
   "state_changed": true,
   "status": "HEALTHY"

@@ -20,7 +20,9 @@ from src.vibetrade.data.okx_models import (
 
 SCHEMA_VERSION = "1.1"
 
-VALID_EXIT_REASONS: frozenset[str] = frozenset({"TAKE_PROFIT", "STOP_LOSS", "TIME_STOP", "SIGNAL_EXIT"})
+VALID_EXIT_REASONS: frozenset[str] = frozenset(
+    {"TAKE_PROFIT", "STOP_LOSS", "TIME_STOP", "SIGNAL_EXIT", "LIQUIDATED"}
+)
 
 
 @dataclass(frozen=True)
@@ -38,7 +40,7 @@ class RejectedOrderRecord:
 
     def __post_init__(self) -> None:
         _check_usdt_inst_id(self.inst_id)
-        if self.side not in {"BUY", "SELL"}:
+        if self.side not in {"BUY", "SELL", "LONG", "SHORT"}:
             raise ModelValidationError(f"Invalid side {self.side!r}")
         _check_decimal_field(self, "proposed_notional_usdt")
         if not self.constraint_code or not self.order_id or not self.signal_id:
@@ -61,7 +63,7 @@ class RejectedOrderRecord:
 
 @dataclass(frozen=True)
 class OpenPosition:
-    """An active open position tracking 3 execution timestamps and schedule drift."""
+    """An active open position tracking 3 execution timestamps, schedule drift, and margin/liquidation."""
 
     position_id: str
     inst_id: str
@@ -78,9 +80,20 @@ class OpenPosition:
     schedule_drift_cost_usdt: Decimal
     current_mark_price: Decimal
     unrealized_pnl_usdt: Decimal
+    side: str = "LONG"
+    leverage: Decimal = Decimal("3")
+    isolated_margin_usdt: Decimal = Decimal("0")
+    contracts: Decimal = Decimal("0")
+    ct_val: Decimal = Decimal("1")
+    liquidation_price: Decimal = Decimal("0")
+    stop_loss_price: Decimal = Decimal("0")
+    take_profit_price: Decimal = Decimal("0")
+    accumulated_funding_usdt: Decimal = Decimal("0")
 
     def __post_init__(self) -> None:
         _check_usdt_inst_id(self.inst_id)
+        if self.side not in {"LONG", "SHORT", "BUY", "SELL"}:
+            raise ModelValidationError(f"Invalid side {self.side!r}")
         for name in ("entry_price", "qty_base", "notional_entry_usdt", "current_mark_price"):
             _check_decimal_field(self, name)
         _check_decimal_field(self, "entry_fee_usdt", positive=False)
@@ -88,13 +101,47 @@ class OpenPosition:
             if getattr(self, name) <= 0:
                 raise ModelValidationError(f"{name} must be positive")
 
+        # Compute defaults for futures fields if unset
+        val_ct = self.ct_val if self.ct_val > Decimal(0) else Decimal("1")
+        object.__setattr__(self, "ct_val", val_ct)
+
+        if self.contracts <= Decimal(0):
+            object.__setattr__(self, "contracts", self.qty_base / val_ct)
+
+        lev = self.leverage if self.leverage > Decimal(0) else Decimal("3")
+        object.__setattr__(self, "leverage", lev)
+
+        if self.isolated_margin_usdt <= Decimal(0):
+            object.__setattr__(self, "isolated_margin_usdt", self.notional_entry_usdt / lev)
+
+        if self.liquidation_price <= Decimal(0):
+            mmr = Decimal("0.01")
+            if self.side in {"SHORT", "SELL"}:
+                liq = self.entry_price * (Decimal("1") + Decimal("1") / lev) / (Decimal("1") + mmr)
+            else:
+                liq = self.entry_price * (Decimal("1") - Decimal("1") / lev) / (Decimal("1") - mmr)
+            object.__setattr__(self, "liquidation_price", max(Decimal("0.00000001"), liq))
+
+        if self.stop_loss_price <= Decimal(0):
+            sl = self.entry_price * Decimal("1.03") if self.side in {"SHORT", "SELL"} else self.entry_price * Decimal("0.97")
+            object.__setattr__(self, "stop_loss_price", sl)
+
+        if self.take_profit_price <= Decimal(0):
+            tp = self.entry_price * Decimal("0.95") if self.side in {"SHORT", "SELL"} else self.entry_price * Decimal("1.05")
+            object.__setattr__(self, "take_profit_price", tp)
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "position_id": self.position_id,
             "inst_id": self.inst_id,
             "entry_order_id": self.entry_order_id,
+            "side": self.side,
             "entry_price": dec_str(self.entry_price.quantize(Decimal("0.00000001"))),
             "qty_base": dec_str(self.qty_base.quantize(Decimal("0.00000001"))),
+            "contracts": dec_str(self.contracts.quantize(Decimal("0.00000001"))),
+            "ct_val": dec_str(self.ct_val.quantize(Decimal("0.00000001"))),
+            "leverage": dec_str(self.leverage.quantize(Decimal("0.01"))),
+            "isolated_margin_usdt": dec_str(self.isolated_margin_usdt.quantize(Decimal("0.0001"))),
             "notional_entry_usdt": dec_str(self.notional_entry_usdt.quantize(Decimal("0.0001"))),
             "entry_fee_usdt": dec_str(self.entry_fee_usdt.quantize(Decimal("0.00000001"))),
             "candle_close_time": self.candle_close_time,
@@ -104,6 +151,10 @@ class OpenPosition:
             "schedule_drift_bps": dec_str(self.schedule_drift_bps.quantize(Decimal("0.01"))),
             "schedule_drift_cost_usdt": dec_str(self.schedule_drift_cost_usdt.quantize(Decimal("0.00000001"))),
             "current_mark_price": dec_str(self.current_mark_price.quantize(Decimal("0.00000001"))),
+            "liquidation_price": dec_str(self.liquidation_price.quantize(Decimal("0.00000001"))),
+            "stop_loss_price": dec_str(self.stop_loss_price.quantize(Decimal("0.00000001"))),
+            "take_profit_price": dec_str(self.take_profit_price.quantize(Decimal("0.00000001"))),
+            "accumulated_funding_usdt": dec_str(self.accumulated_funding_usdt.quantize(Decimal("0.00000001"))),
             "unrealized_pnl_usdt": dec_str(self.unrealized_pnl_usdt.quantize(Decimal("0.00000001"))),
         }
 
@@ -126,9 +177,12 @@ class ClosedTradeRecord:
     entry_timestamp: int
     exit_timestamp: int
     exit_reason: str
+    side: str = "LONG"
 
     def __post_init__(self) -> None:
         _check_usdt_inst_id(self.inst_id)
+        if self.side not in {"LONG", "SHORT", "BUY", "SELL"}:
+            raise ModelValidationError(f"Invalid side {self.side!r}")
         for name in ("entry_price", "exit_price", "qty_base"):
             _check_decimal_field(self, name)
         for name in ("entry_fee_usdt", "exit_fee_usdt"):
@@ -143,6 +197,7 @@ class ClosedTradeRecord:
             "trade_id": self.trade_id,
             "position_id": self.position_id,
             "inst_id": self.inst_id,
+            "side": self.side,
             "entry_price": dec_str(self.entry_price.quantize(Decimal("0.00000001"))),
             "exit_price": dec_str(self.exit_price.quantize(Decimal("0.00000001"))),
             "qty_base": dec_str(self.qty_base.quantize(Decimal("0.00000001"))),
@@ -173,6 +228,7 @@ class PaperPortfolioSnapshot:
     open_positions: tuple[OpenPosition, ...]
     closed_trades: tuple[ClosedTradeRecord, ...]
     rejected_orders: tuple[RejectedOrderRecord, ...]
+    total_funding_fees_usdt: Decimal = Decimal("0.00")
 
     def __post_init__(self) -> None:
         if self.schema_version != SCHEMA_VERSION:
@@ -195,6 +251,7 @@ class PaperPortfolioSnapshot:
             "total_unrealized_pnl_usdt": dec_str(self.total_unrealized_pnl_usdt.quantize(Decimal("0.00000001"))),
             "total_fees_paid_usdt": dec_str(self.total_fees_paid_usdt.quantize(Decimal("0.00000001"))),
             "total_schedule_drift_cost_usdt": dec_str(self.total_schedule_drift_cost_usdt.quantize(Decimal("0.00000001"))),
+            "total_funding_fees_usdt": dec_str(self.total_funding_fees_usdt.quantize(Decimal("0.00000001"))),
             "open_positions": [p.to_dict() for p in self.open_positions],
             "closed_trades": [t.to_dict() for t in self.closed_trades],
             "rejected_orders": [r.to_dict() for r in self.rejected_orders],
