@@ -1,0 +1,32 @@
+{
+  "cash_balance_usdt": "8.49729880",
+  "closed_trades": [],
+  "cumulative_realized_pnl_usdt": "0.00000000",
+  "generated_at_utc_ms": 1793357771254,
+  "initial_balance_usdt": "10.0000",
+  "open_positions": [
+    {
+      "candle_close_time": 1793357100000,
+      "current_mark_price": "150.12000000",
+      "entry_fee_usdt": "0.00150120",
+      "entry_order_id": "ord:SOL-USDT:15m:1793357100000:1793357771254",
+      "entry_price": "150.12000000",
+      "execution_timestamp": 1793357771254,
+      "inst_id": "SOL-USDT",
+      "notional_entry_usdt": "1.5012",
+      "position_id": "pos:SOL-USDT:1793357771254",
+      "qty_base": "0.01000000",
+      "schedule_drift_bps": "-339.46",
+      "schedule_drift_cost_usdt": "-0.05282800",
+      "schedule_drift_ms": 671254,
+      "signal_timestamp": 1793357771254,
+      "unrealized_pnl_usdt": "0.00000000"
+    }
+  ],
+  "rejected_orders": [],
+  "schema_version": "1.1",
+  "total_equity_usdt": "9.99849880",
+  "total_fees_paid_usdt": "0.00150120",
+  "total_schedule_drift_cost_usdt": "-0.05282800",
+  "total_unrealized_pnl_usdt": "0.00000000"
+}

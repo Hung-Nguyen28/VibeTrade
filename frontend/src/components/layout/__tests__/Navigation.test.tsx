@@ -1,79 +1,81 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import i18n from "@/i18n";
 import { SidebarNavigation } from "../SidebarNavigation";
 import { PageHelp } from "../PageHelp";
 
-beforeAll(async () => { await i18n.changeLanguage("en"); });
-
 function renderNavigation(path = "/", collapsed = false) {
-  return render(<MemoryRouter initialEntries={[path]}><SidebarNavigation collapsed={collapsed} /><PageHelp /></MemoryRouter>);
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <SidebarNavigation collapsed={collapsed} />
+      <PageHelp />
+    </MemoryRouter>
+  );
 }
 
-it("keeps every feature directly reachable and distinguishes tasks from tools and setup", () => {
-  renderNavigation();
-  expect(within(screen.getByRole("region", { name: "Everyday research" })).getAllByRole("link").map((link) => link.getAttribute("href")))
-    .toEqual(["/", "/reports", "/research-artifacts", "/paper-trading", "/portfolio"]);
-  expect(within(screen.getByRole("region", { name: "Specialized analysis" })).getAllByRole("link").map((link) => link.getAttribute("href")))
-    .toEqual(["/alpha-zoo", "/options", "/correlation"]);
-  expect(within(screen.getByRole("region", { name: "Automation & setup" })).getAllByRole("link").map((link) => link.getAttribute("href")))
-    .toEqual(["/pixel-office", "/scheduled", "/runtime", "/settings"]);
-  expect(screen.getByRole("link", { name: "Research assistant" })).toHaveAttribute("aria-current", "page");
-});
+describe("VibeTrade v1.1 Sidebar Navigation (Phase P7-B)", () => {
+  it("renders all 7 core quant intelligence screens directly", () => {
+    renderNavigation("/");
 
-it("retains labels and help in a compact sidebar, including nested factor routes", () => {
-  renderNavigation("/alpha-zoo/compare", true);
-  const link = screen.getByRole("link", { name: "Factor research" });
-  expect(link).toHaveAttribute("aria-current", "page");
-  expect(link).toHaveAttribute("title", expect.stringContaining("stock-selection signals"));
-  expect(screen.getByRole("navigation").querySelectorAll('[aria-current="page"]')).toHaveLength(1);
-});
+    const links = screen.getAllByRole("link");
+    const hrefs = links.map((l) => l.getAttribute("href"));
 
-it("explains the backtest prerequisite and the separate location of chat-generated documents", () => {
-  renderNavigation("/reports");
-  fireEvent.click(screen.getByText("How to use Backtest reports"));
-  expect(screen.getByText(/Download PDFs and other chat-generated documents/)).toBeVisible();
-  expect(screen.getByRole("link", { name: "Start with the research assistant" })).toHaveAttribute("href", "/");
-});
+    expect(hrefs).toContain("/");
+    expect(hrefs).toContain("/scanner");
+    expect(hrefs).toContain("/queue");
+    expect(hrefs).toContain("/research");
+    expect(hrefs).toContain("/portfolio");
+    expect(hrefs).toContain("/performance");
+    expect(hrefs).toContain("/monitor");
 
-it("resets page help on navigation and states the scheduler prerequisite", () => {
-  renderNavigation("/reports");
-  fireEvent.click(screen.getByText("How to use Backtest reports"));
-  fireEvent.click(screen.getByRole("link", { name: "Scheduled research" }));
-  const summary = screen.getByText("How to use Scheduled research");
-  expect(summary.closest("details")).not.toHaveAttribute("open");
-  fireEvent.click(summary);
-  expect(screen.getByText(/local scheduler must be enabled/)).toBeVisible();
-});
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+  });
 
-it("opens a labeled feature menu in compact mode and returns focus on Escape", () => {
-  renderNavigation("/", true);
-  const trigger = screen.getByRole("button", { name: "Browse features" });
-  fireEvent.click(trigger);
-  const menu = screen.getByRole("navigation", { name: "Browse features" });
-  expect(within(menu).getByText("Options analysis")).toBeVisible();
-  expect(within(menu).getByText("Pixel Office")).toBeVisible();
-  expect(within(menu).getByText("Trading status")).toBeVisible();
-  expect(within(menu).getAllByRole("link")).toHaveLength(12);
-  fireEvent.keyDown(document, { key: "Escape" });
-  expect(screen.queryByRole("navigation", { name: "Browse features" })).not.toBeInTheDocument();
-  expect(trigger).toHaveFocus();
-});
+  it("marks active page correctly when navigating to /scanner", () => {
+    renderNavigation("/scanner");
+    expect(screen.getByRole("link", { name: "Market Scanner" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+  });
 
-it("closes the feature menu after selecting a destination", () => {
-  renderNavigation("/", true);
-  fireEvent.click(screen.getByRole("button", { name: "Browse features" }));
-  const menu = screen.getByRole("navigation", { name: "Browse features" });
-  fireEvent.click(within(menu).getByRole("link", { name: "Backtest reports" }));
-  expect(screen.queryByRole("navigation", { name: "Browse features" })).not.toBeInTheDocument();
-  expect(screen.getByText("How to use Backtest reports")).toBeInTheDocument();
-});
+  it("marks active page correctly when navigating to /research", () => {
+    renderNavigation("/research");
+    expect(screen.getByRole("link", { name: "AI Research Room" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+  });
 
+  it("retains links in compact sidebar mode", () => {
+    renderNavigation("/portfolio", true);
+    const link = screen.getByRole("link", { name: "Paper Portfolio" });
+    expect(link).toHaveAttribute("aria-current", "page");
+  });
 
-it("links paper accounts and explains completed-session simulation", () => {
-  renderNavigation("/paper-trading");
-  expect(screen.getByRole("link", { name: "Paper trading" })).toHaveAttribute("aria-current", "page");
-  fireEvent.click(screen.getByText("How to use Paper trading"));
-  expect(screen.getByText(/No broker orders are sent/)).toBeVisible();
-  expect(screen.getByText(/Only completed daily bars can settle/)).toBeVisible();
+  it("opens mobile navigation menu when toggle clicked and closes on Escape", () => {
+    renderNavigation("/", true);
+    const menuBtn = screen.getByLabelText("Toggle navigation menu");
+    fireEvent.click(menuBtn);
+
+    expect(screen.getByLabelText("Mobile Navigation Drawer")).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByLabelText("Mobile Navigation Drawer")).not.toBeInTheDocument();
+  });
+
+  it("closes drawer when a navigation item is clicked", () => {
+    renderNavigation("/", true);
+    const menuBtn = screen.getByLabelText("Toggle navigation menu");
+    fireEvent.click(menuBtn);
+
+    const drawer = screen.getByLabelText("Mobile Navigation Drawer");
+    const scannerLink = drawer.querySelector('a[href="/scanner"]');
+    if (scannerLink) {
+      fireEvent.click(scannerLink);
+    }
+    expect(screen.queryByLabelText("Mobile Navigation Drawer")).not.toBeInTheDocument();
+  });
 });

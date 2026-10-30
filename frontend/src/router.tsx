@@ -1,51 +1,34 @@
 import { Suspense, lazy, type ComponentType } from "react";
-import { createBrowserRouter } from "react-router";
+import { createHashRouter, Navigate } from "react-router";
 import { Layout } from "@/components/layout/Layout";
 
-const Home = lazy(() => import("@/pages/Home").then((m) => ({ default: m.Home })));
-const Agent = lazy(() => import("@/pages/Agent").then((m) => ({ default: m.Agent })));
-const RunDetail = lazy(() =>
-  import("@/pages/RunDetail").then((m) => ({ default: m.RunDetail })),
+// 7 VibeTrade v1.1 Screens
+const Overview = lazy(() =>
+  import("@/pages/vibetrade/Overview").then((m) => ({ default: m.Overview }))
 );
-const Compare = lazy(() =>
-  import("@/pages/Compare").then((m) => ({ default: m.Compare })),
+const MarketScanner = lazy(() =>
+  import("@/pages/vibetrade/MarketScanner").then((m) => ({ default: m.MarketScanner }))
 );
-const Settings = lazy(() =>
-  import("@/pages/Settings").then((m) => ({ default: m.Settings })),
+const OpportunityQueue = lazy(() =>
+  import("@/pages/vibetrade/OpportunityQueue").then((m) => ({ default: m.OpportunityQueue }))
 );
-const Runtime = lazy(() =>
-  import("@/pages/Runtime").then((m) => ({ default: m.Runtime })),
+const AIResearchRoom = lazy(() =>
+  import("@/pages/vibetrade/AIResearchRoom").then((m) => ({ default: m.AIResearchRoom }))
 );
-const Scheduled = lazy(() =>
-  import("@/pages/Scheduled").then((m) => ({ default: m.Scheduled })),
+const PaperPortfolio = lazy(() =>
+  import("@/pages/vibetrade/PaperPortfolio").then((m) => ({ default: m.PaperPortfolio }))
 );
-const Reports = lazy(() =>
-  import("@/pages/Reports").then((m) => ({ default: m.Reports })),
+const Performance = lazy(() =>
+  import("@/pages/vibetrade/Performance").then((m) => ({ default: m.Performance }))
 );
-const ResearchArtifacts = lazy(() =>
-  import("@/pages/ResearchArtifacts").then((m) => ({ default: m.ResearchArtifacts })),
-);
-const PaperTrading = lazy(() => import("@/pages/PaperTrading").then((m) => ({ default: m.PaperTrading })));
-const Portfolio = lazy(() =>
-  import("@/pages/Portfolio").then((m) => ({ default: m.Portfolio })),
-);
-const Correlation = lazy(() =>
-  import("@/pages/Correlation").then((m) => ({ default: m.Correlation })),
-);
-const AlphaZoo = lazy(() =>
-  import("@/pages/AlphaZoo").then((m) => ({ default: m.AlphaZoo })),
-);
-const OptionsLab = lazy(() =>
-  import("@/pages/OptionsLab").then((m) => ({ default: m.OptionsLab })),
-);
-const PixelOffice = lazy(() =>
-  import("@/pages/PixelOffice").then((m) => ({ default: m.PixelOffice })),
+const SystemMonitor = lazy(() =>
+  import("@/pages/vibetrade/SystemMonitor").then((m) => ({ default: m.SystemMonitor }))
 );
 
 function PageLoader() {
   return (
-    <div className="flex h-[60vh] items-center justify-center text-muted-foreground">
-      Loading…
+    <div className="flex h-[60vh] items-center justify-center text-xs font-mono text-muted-foreground animate-pulse">
+      Loading Quant Intelligence Terminal…
     </div>
   );
 }
@@ -58,29 +41,24 @@ function wrap(Component: ComponentType) {
   );
 }
 
-export const router = createBrowserRouter([
+// HashRouter ensures seamless page reload on GitHub Pages subpaths with zero 404s
+export const router = createHashRouter([
   {
     element: <Layout />,
     children: [
-      { path: "/", element: wrap(Agent) },
-      { path: "/about", element: wrap(Home) },
-      { path: "/agent", element: wrap(Agent) },
-      { path: "/pixel-office", element: wrap(PixelOffice) },
-      { path: "/runtime", element: wrap(Runtime) },
-      { path: "/scheduled", element: wrap(Scheduled) },
-      { path: "/reports", element: wrap(Reports) },
-      { path: "/research-artifacts", element: wrap(ResearchArtifacts) },
-      { path: "/paper-trading", element: wrap(PaperTrading) },
-      { path: "/portfolio", element: wrap(Portfolio) },
-      { path: "/settings", element: wrap(Settings) },
-      { path: "/runs/:runId", element: wrap(RunDetail) },
-      { path: "/compare", element: wrap(Compare) },
-      { path: "/correlation", element: wrap(Correlation) },
-      { path: "/options", element: wrap(OptionsLab) },
-      { path: "/alpha-zoo", element: wrap(AlphaZoo) },
-      { path: "/alpha-zoo/bench", element: wrap(AlphaZoo) },
-      { path: "/alpha-zoo/compare", element: wrap(AlphaZoo) },
-      { path: "/alpha-zoo/:alphaId", element: wrap(AlphaZoo) },
+      { path: "/", element: wrap(Overview) },
+      { path: "/overview", element: wrap(Overview) },
+      { path: "/scanner", element: wrap(MarketScanner) },
+      { path: "/queue", element: wrap(OpportunityQueue) },
+      { path: "/research", element: wrap(AIResearchRoom) },
+      { path: "/portfolio", element: wrap(PaperPortfolio) },
+      { path: "/performance", element: wrap(Performance) },
+      { path: "/monitor", element: wrap(SystemMonitor) },
+      // Fallback for legacy routes
+      { path: "/agent", element: <Navigate to="/" replace /> },
+      { path: "/reports", element: <Navigate to="/research" replace /> },
+      { path: "/paper-trading", element: <Navigate to="/portfolio" replace /> },
+      { path: "*", element: <Navigate to="/" replace /> },
     ],
   },
 ]);

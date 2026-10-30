@@ -55,6 +55,11 @@ from backtest.loaders.base import (
     validate_date_range,
 )
 from backtest.loaders.registry import register
+from src.vibetrade.data.bar_close import bar_duration_ms, filter_closed_rows, utc_now_ms
+
+#: Bump when the closed-bar contract changes so opt-in parquet caches written
+#: by an older loader (which could hold unconfirmed candles) are never reused.
+_OKX_CACHE_REVISION = "p1-closed-bars-v1"
 
 BASE_URL = "https://www.okx.com/api/v5"
 CANDLES_PATH = f"{BASE_URL}/market/candles"
@@ -191,6 +196,7 @@ class DataLoader:
                     start_date=start_date,
                     end_date=end_date,
                     fields=None,
+                    source_revision=_OKX_CACHE_REVISION,
                     fetch=lambda symbol=symbol, use_history=use_history: self._fetch_candles(
                         session,
                         symbol,
@@ -201,6 +207,9 @@ class DataLoader:
                         prefer_history=use_history,
                     ),
                 )
+                if df is not None and "candle_close_time" in df.columns:
+                    # Defence in depth: re-assert the closed-bar gate on cached frames.
+                    df = df[df["candle_close_time"] <= utc_now_ms()]
                 if df is not None and not df.empty:
                     result[symbol] = df
             except Exception as exc:
@@ -276,6 +285,8 @@ class DataLoader:
     ) -> Optional[pd.DataFrame]:
         all_rows: list = []
         after = str(end_ts)
+        now_ms = utc_now_ms()
+        bar_ms = bar_duration_ms(bar)
         deadline = time.monotonic() + _OKX_FETCH_BUDGET_S
         label = f"OKX fetch for {inst_id} via {endpoint.rsplit('/', 1)[-1]}"
 
@@ -324,11 +335,11 @@ class DataLoader:
             if not raw_rows:
                 break
 
-            # Keep confirmed bars (confirm=="1"); also keep unconfirmed when
-            # it is the only data returned so live partial days are not empty.
-            confirmed = [r for r in raw_rows if len(r) > 8 and str(r[8]) == "1"]
-            rows = confirmed if confirmed else list(raw_rows)
-            all_rows.extend(rows)
+            # P1 Bar-Close Confirmation (quant-data-guard): keep a bar ONLY when
+            # confirm == "1" AND candle_close_time <= current UTC ms. There is no
+            # "keep unconfirmed when nothing else came back" fallback: a running
+            # candle must never be repainted into history.
+            all_rows.extend(filter_closed_rows(raw_rows, bar, now_ms))
 
             oldest_ts = int(raw_rows[-1][0])
             if oldest_ts <= start_ts or len(raw_rows) < _MAX_PER_PAGE:
@@ -359,6 +370,10 @@ class DataLoader:
         for col in ["open", "high", "low", "close"]:
             df[col] = pd.to_numeric(df[col], errors="coerce")
         df["volume"] = pd.to_numeric(df["vol"], errors="coerce").fillna(0)
+        # Keep the quote-currency (USDT) volume for P2 liquidity ranking and the
+        # bar close time (UTC epoch ms) so consumers can re-verify the gate.
+        df["vol_quote"] = pd.to_numeric(df["volCcyQuote"], errors="coerce").fillna(0)
+        df["candle_close_time"] = pd.to_numeric(df["ts"], errors="coerce") + bar_ms
         df = df.dropna(subset=["trade_date"]).set_index("trade_date").sort_index()
         df = df[~df.index.duplicated(keep="last")]
 
@@ -366,7 +381,8 @@ class DataLoader:
         end_dt = pd.Timestamp(end_ts, unit="ms")
         df = df[(df.index >= start_dt) & (df.index < end_dt)]
 
-        df = df[["open", "high", "low", "close", "volume"]].dropna(
-            subset=["open", "high", "low", "close"]
-        )
+        df = df[
+            ["open", "high", "low", "close", "volume", "vol_quote", "candle_close_time"]
+        ].dropna(subset=["open", "high", "low", "close", "candle_close_time"])
+        df["candle_close_time"] = df["candle_close_time"].astype("int64")
         return df if not df.empty else None

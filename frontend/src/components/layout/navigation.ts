@@ -1,29 +1,84 @@
-import { FlaskConical, Building2, Activity, BarChart3, BookOpen, Bot, CalendarClock, CandlestickChart, FileText, Layers, Settings, WalletCards } from "lucide-react";
+import {
+  LayoutDashboard,
+  Search,
+  Layers,
+  Scale,
+  WalletCards,
+  TrendingUp,
+  Activity,
+  type LucideIcon,
+} from "lucide-react";
+
+export interface NavigationItem {
+  id: string;
+  to: string;
+  icon: LucideIcon;
+  label: string;
+  description: string;
+}
+
+export const NAVIGATION_ITEMS: NavigationItem[] = [
+  {
+    id: "overview",
+    to: "/",
+    icon: LayoutDashboard,
+    label: "Overview",
+    description: "$10 Equity, PnL separation, Market Regime & Top Opportunities",
+  },
+  {
+    id: "scanner",
+    to: "/scanner",
+    icon: Search,
+    label: "Market Scanner",
+    description: "OKX Public USDT Spot monitoring, Spreads, Slippage & Anomaly flags",
+  },
+  {
+    id: "queue",
+    to: "/queue",
+    icon: Layers,
+    label: "Opportunity Queue",
+    description: "Candidate lifecycle, Idempotent signal_id & Technical triggers",
+  },
+  {
+    id: "research",
+    to: "/research",
+    icon: Scale,
+    label: "AI Research Room",
+    description: "Bull vs Bear Weighted Scoring, Evidence Binding & Audit Receipts",
+  },
+  {
+    id: "portfolio",
+    to: "/portfolio",
+    icon: WalletCards,
+    label: "Paper Portfolio",
+    description: "$10 Micro account, 3 Timestamps, Drift Cost & Constraint Rejections",
+  },
+  {
+    id: "performance",
+    to: "/performance",
+    icon: TrendingUp,
+    label: "Performance",
+    description: "Net Equity Curve vs Baselines ($10 Cash & BTC), Friction Decomposition",
+  },
+  {
+    id: "monitor",
+    to: "/monitor",
+    icon: Activity,
+    label: "System Monitor",
+    description: "Heartbeat health, GitHub Actions schedule drift & SHA-256 Hashes",
+  },
+];
 
 export const NAVIGATION_GROUPS = [
-  { id: "research", items: [
-    { id: "agent", to: "/", icon: Bot },
-    { id: "reports", to: "/reports", icon: FileText },
-    { id: "researchArtifacts", to: "/research-artifacts", icon: BookOpen },
-    { id: "paperTrading", to: "/paper-trading", icon: FlaskConical },
-    { id: "portfolio", to: "/portfolio", icon: WalletCards },
-  ] },
-  { id: "analysis", items: [
-    { id: "alphaZoo", to: "/alpha-zoo", icon: Layers },
-    { id: "optionsLab", to: "/options", icon: CandlestickChart },
-    { id: "correlation", to: "/correlation", icon: BarChart3 },
-  ] },
-  { id: "automation", items: [
-    { id: "pixelOffice", to: "/pixel-office", icon: Building2 },
-    { id: "scheduled", to: "/scheduled", icon: CalendarClock },
-    { id: "runtime", to: "/runtime", icon: Activity },
-    { id: "settings", to: "/settings", icon: Settings },
-  ] },
-] as const;
-
-export type NavigationItem = typeof NAVIGATION_GROUPS[number]["items"][number];
+  {
+    id: "vibetrade",
+    items: NAVIGATION_ITEMS,
+  },
+];
 
 export function isNavigationActive(to: string, pathname: string): boolean {
-  return to === "/" ? pathname === "/" || pathname === "/agent"
-    : pathname === to || pathname.startsWith(`${to}/`);
+  if (to === "/") {
+    return pathname === "/" || pathname === "/overview";
+  }
+  return pathname === to || pathname.startsWith(`${to}/`);
 }

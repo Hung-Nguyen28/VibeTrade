@@ -1,0 +1,92 @@
+{
+  "generated_at_utc_ms": 1793357771254,
+  "reports": [
+    {
+      "candle_close_time": 1793357100000,
+      "evaluated_at_utc_ms": 1793357771254,
+      "evidence": [
+        {
+          "candle_close_time": 1793357100000,
+          "metric": "rvol_20",
+          "persona": "bull_researcher",
+          "rule_id": "BULL_RVOL_SURGE_01",
+          "score_contribution": "25.00",
+          "template_summary": "RVOL(20) at 6.00x (Z=0.00) indicates strong volume participation (+25.00 pts).",
+          "threshold": ">= 2.00x",
+          "value": "6.00x",
+          "weight": "25.00"
+        },
+        {
+          "candle_close_time": 1793357100000,
+          "metric": "rsi_14",
+          "persona": "bull_researcher",
+          "rule_id": "BULL_EMA_MOMENTUM_02",
+          "score_contribution": "25.00",
+          "template_summary": "Bullish EMA alignment (EMA9 > EMA21) with healthy RSI at 68.72 (+25.00 pts).",
+          "threshold": "52.00 <= RSI <= 75.00",
+          "value": "68.72",
+          "weight": "25.00"
+        },
+        {
+          "candle_close_time": 1793357100000,
+          "metric": "htf_trend",
+          "persona": "bull_researcher",
+          "rule_id": "BULL_HTF_ALIGNMENT_03",
+          "score_contribution": "10.00",
+          "template_summary": "Higher timeframe trend is neutral, partial points awarded (+10.00 pts).",
+          "threshold": ">= NEUTRAL",
+          "value": "NEUTRAL",
+          "weight": "20.00"
+        },
+        {
+          "candle_close_time": 1793357100000,
+          "metric": "imbalance_ratio",
+          "persona": "bull_researcher",
+          "rule_id": "BULL_OB_IMBALANCE_04",
+          "score_contribution": "7.50",
+          "template_summary": "L2 orderbook shows positive bid dominance with imbalance +0.25 (+7.50 pts).",
+          "threshold": ">= +0.10",
+          "value": "+0.25",
+          "weight": "15.00"
+        },
+        {
+          "candle_close_time": 1793357100000,
+          "metric": "est_buy_slippage_bps",
+          "persona": "bull_researcher",
+          "rule_id": "BULL_TIGHT_SLIPPAGE_05",
+          "score_contribution": "15.00",
+          "template_summary": "Micro-order ($10) fills with low slippage 3.50 bps and tight spread 10.00 bps (+15.00 pts).",
+          "threshold": "<= 6.00 bps",
+          "value": "3.50 bps",
+          "weight": "15.00"
+        },
+        {
+          "candle_close_time": 1793357100000,
+          "metric": "distance_to_high_20_pct",
+          "persona": "bear_researcher",
+          "rule_id": "BEAR_RESISTANCE_NEAR_05",
+          "score_contribution": "15.00",
+          "template_summary": "Price is within -0.73% of 20-bar resistance high, risking rejection (+15.00 risk pts).",
+          "threshold": "<= 0.50%",
+          "value": "-0.73%",
+          "weight": "15.00"
+        }
+      ],
+      "inst_id": "SOL-USDT",
+      "missing_inputs": [],
+      "regime": "BULL_TREND",
+      "regime_multiplier": "1.10",
+      "report_id": "rep:SOL-USDT:15m:1793357100000",
+      "score_bear": "15.00",
+      "score_bull": "82.50",
+      "score_net": "74.25",
+      "score_raw": "67.50",
+      "signal_id": "SOL-USDT:15m:1793357100000",
+      "template_summary": "Verdict ACTIONABLE_LONG for SOL-USDT (15m): S_Bull=82.50, S_Bear=15.00, S_raw=+67.50, S_net=+74.25 (Regime: BULL_TREND, M=1.10). Reason: Net score +74.25 >= 30.00 and bear risk 15.00 <= 35.00. Active Evidence: 5 bull factors, 1 bear risks.",
+      "timeframe": "15m",
+      "verdict": "ACTIONABLE_LONG"
+    }
+  ],
+  "schema_version": "1.1",
+  "total_reports": 1
+}

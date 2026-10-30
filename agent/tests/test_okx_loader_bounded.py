@@ -98,7 +98,7 @@ def test_happy_path_single_call(monkeypatch):
     session.get = seq
     df = DataLoader()._paginate(session, okx.CANDLES_PATH, "BTC-USDT", S, E, "1D", 20)
     assert seq.calls == 1
-    assert list(df.columns) == ["open", "high", "low", "close", "volume"]
+    assert list(df.columns) == ["open", "high", "low", "close", "volume", "vol_quote", "candle_close_time"]
     assert_loader_contract(df, context="okx paginated daily")
 
 

@@ -1,0 +1,48 @@
+{
+  "candidates": [
+    {
+      "anomaly_types": [
+        "BREAKOUT",
+        "MOMENTUM_SHIFT",
+        "VOLUME_SPIKE"
+      ],
+      "candle_close_time": 1793357100000,
+      "detected_at_utc_ms": 1793357771254,
+      "inst_id": "SOL-USDT",
+      "metrics": {
+        "atr": "1.6278",
+        "bar_range": "1.554",
+        "price": "155.4028",
+        "raw_score": "60.0",
+        "rsi": "68.72",
+        "rvol": "6.0",
+        "volume_zscore": "0.0"
+      },
+      "regime": "BULL_TREND",
+      "scanner_score": "66.00",
+      "signal_id": "SOL-USDT:15m:1793357100000",
+      "status": "EVALUATED",
+      "timeframe": "15m"
+    }
+  ],
+  "generated_at_utc_ms": 1793357771254,
+  "market_regime": {
+    "btc_atr_pct": "1.0090",
+    "btc_ema_fast": "71083.55",
+    "btc_ema_slow": "70791.79",
+    "btc_price": "71506.43",
+    "btc_rsi": "58.51",
+    "details": {
+      "atr_rank_percentile": 95.74,
+      "candles_analyzed": 60,
+      "is_ema_bear": false,
+      "is_ema_bull": true
+    },
+    "detected_at_utc_ms": 1793357771254,
+    "market_breadth_pct": "100.00",
+    "multiplier": "1.10",
+    "regime": "BULL_TREND"
+  },
+  "queue_size": 1,
+  "schema_version": "1.1"
+}
