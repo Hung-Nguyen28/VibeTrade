@@ -1,0 +1,22 @@
+{
+  "cycle_finished_at_utc_ms": 1793374097299,
+  "cycle_started_at_utc_ms": 1793374095185,
+  "duration_ms": 1874,
+  "error_summary": null,
+  "focus_sessions_triggered": 0,
+  "okx_api_status": "OK",
+  "orders_executed_count": 0,
+  "orders_rejected_count": 0,
+  "run_id": "run:cycle:1793374095185",
+  "scanned_symbols_count": 5,
+  "schedule_drift_ms": 0,
+  "schema_version": "1.1",
+  "snapshot_hashes": {
+    "market_snapshot_sha256": "02658444dbde719fb4e748008915605bb4b59f6dbf777eee13afb363e171e2b4",
+    "opportunity_queue_sha256": "a225c84d722aafd7c4c87c88543cafbf6ef6405b11dbf27a5e9783d22f5a47ac",
+    "paper_portfolio_sha256": "149180169348505ca8edac1e210ced012192131cfc0408b4e483f24055539442",
+    "research_history_sha256": "6602d6ba202327ea017d87f618d6bd0fbdca554571e9a856ddcde2d2697ded2b"
+  },
+  "state_changed": true,
+  "status": "HEALTHY"
+}

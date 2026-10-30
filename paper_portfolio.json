@@ -1,0 +1,15 @@
+{
+  "cash_balance_usdt": "10.00000000",
+  "closed_trades": [],
+  "cumulative_realized_pnl_usdt": "0.00000000",
+  "generated_at_utc_ms": 1793374095185,
+  "initial_balance_usdt": "10.0000",
+  "open_positions": [],
+  "rejected_orders": [],
+  "schema_version": "1.1",
+  "total_equity_usdt": "10.00000000",
+  "total_fees_paid_usdt": "0.00000000",
+  "total_funding_fees_usdt": "0.00000000",
+  "total_schedule_drift_cost_usdt": "0.00000000",
+  "total_unrealized_pnl_usdt": "0.00000000"
+}

@@ -1,0 +1,9 @@
+{
+  "btc_t0_price_usdt": "77563.9",
+  "experiment_id": "exp:v1.1:7days:1793374095185",
+  "fee_rate": "0.001",
+  "initial_capital_usdt": "10.00000000",
+  "schema_version": "1.1",
+  "status": "INITIALIZED",
+  "t0_utc_ms": 1793374095185
+}
