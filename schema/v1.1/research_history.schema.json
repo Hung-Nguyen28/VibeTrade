@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibetrade.local/schema/v1.1/research_history.schema.json",
+  "title": "VibeTrade v1.1 research_history.json",
+  "description": "Deterministic Explainable Research Team reports and audit trail for P4/P5. Plain decimal strings, bar-close confirmed, zero LLM cost.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at_utc_ms",
+    "total_reports",
+    "reports"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.1" },
+    "generated_at_utc_ms": { "type": "integer", "exclusiveMinimum": 0 },
+    "total_reports": { "type": "integer", "minimum": 0 },
+    "reports": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/report" }
+    }
+  },
+  "$defs": {
+    "inst_id": { "type": "string", "pattern": "^[A-Z0-9]+-USDT$" },
+    "dec_pos": {
+      "type": "string",
+      "pattern": "^(?=[0-9.]*[1-9])[0-9]+(?:\\.[0-9]+)?$",
+      "description": "Finite decimal string, plain notation, strictly > 0."
+    },
+    "dec_nonneg": {
+      "type": "string",
+      "pattern": "^[0-9]+(?:\\.[0-9]+)?$",
+      "description": "Finite decimal string, plain notation, >= 0."
+    },
+    "dec_signed": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$",
+      "description": "Finite decimal string, plain notation, signed."
+    },
+    "epoch_ms": { "type": "integer", "exclusiveMinimum": 0 },
+    "timeframe": {
+      "enum": ["1m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "6H", "12H", "1D"]
+    },
+    "regime_enum": {
+      "enum": ["BULL_TREND", "BEAR_TREND", "HIGH_VOL_CHOP", "RANGE_BOUND"]
+    },
+    "verdict_enum": {
+      "enum": ["ACTIONABLE_LONG", "WATCHLIST_NEUTRAL", "AVOID_BEARISH", "INCONCLUSIVE"]
+    },
+    "persona_enum": {
+      "enum": ["bull_researcher", "bear_researcher"]
+    },
+    "evidence_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "persona",
+        "metric",
+        "value",
+        "threshold",
+        "weight",
+        "score_contribution",
+        "candle_close_time",
+        "template_summary"
+      ],
+      "properties": {
+        "rule_id": { "type": "string", "minLength": 1 },
+        "persona": { "$ref": "#/$defs/persona_enum" },
+        "metric": { "type": "string", "minLength": 1 },
+        "value": { "type": "string", "minLength": 1 },
+        "threshold": { "type": "string", "minLength": 1 },
+        "weight": { "$ref": "#/$defs/dec_nonneg" },
+        "score_contribution": { "$ref": "#/$defs/dec_nonneg" },
+        "candle_close_time": { "$ref": "#/$defs/epoch_ms" },
+        "template_summary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "report_id",
+        "signal_id",
+        "inst_id",
+        "timeframe",
+        "candle_close_time",
+        "verdict",
+        "score_bull",
+        "score_bear",
+        "score_raw",
+        "score_net",
+        "regime",
+        "regime_multiplier",
+        "evidence",
+        "template_summary",
+        "evaluated_at_utc_ms",
+        "missing_inputs"
+      ],
+      "properties": {
+        "report_id": {
+          "type": "string",
+          "pattern": "^rep:[A-Z0-9]+-USDT:(1m|3m|5m|15m|30m|1H|2H|4H|6H|12H|1D):[0-9]+$"
+        },
+        "signal_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9]+-USDT:(1m|3m|5m|15m|30m|1H|2H|4H|6H|12H|1D):[0-9]+$"
+        },
+        "inst_id": { "$ref": "#/$defs/inst_id" },
+        "timeframe": { "$ref": "#/$defs/timeframe" },
+        "candle_close_time": { "$ref": "#/$defs/epoch_ms" },
+        "verdict": { "$ref": "#/$defs/verdict_enum" },
+        "score_bull": { "$ref": "#/$defs/dec_nonneg" },
+        "score_bear": { "$ref": "#/$defs/dec_nonneg" },
+        "score_raw": { "$ref": "#/$defs/dec_signed" },
+        "score_net": { "$ref": "#/$defs/dec_signed" },
+        "regime": { "$ref": "#/$defs/regime_enum" },
+        "regime_multiplier": { "$ref": "#/$defs/dec_pos" },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence_item" }
+        },
+        "template_summary": { "type": "string", "minLength": 1 },
+        "evaluated_at_utc_ms": { "$ref": "#/$defs/epoch_ms" },
+        "missing_inputs": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

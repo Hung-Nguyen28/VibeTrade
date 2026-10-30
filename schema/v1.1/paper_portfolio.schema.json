@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibetrade.local/schema/v1.1/paper_portfolio.schema.json",
+  "title": "VibeTrade v1.1 paper_portfolio.json",
+  "description": "Paper Trading micro-portfolio ($10.0) state. Strict 3-timestamp integrity, schedule drift cost tracking, isolated realized/unrealized PnL, high-precision decimals.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generated_at_utc_ms",
+    "initial_balance_usdt",
+    "cash_balance_usdt",
+    "total_equity_usdt",
+    "cumulative_realized_pnl_usdt",
+    "total_unrealized_pnl_usdt",
+    "total_fees_paid_usdt",
+    "total_schedule_drift_cost_usdt",
+    "open_positions",
+    "closed_trades",
+    "rejected_orders"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.1" },
+    "generated_at_utc_ms": { "type": "integer", "exclusiveMinimum": 0 },
+    "initial_balance_usdt": { "$ref": "#/$defs/dec_pos" },
+    "cash_balance_usdt": { "$ref": "#/$defs/dec_nonneg" },
+    "total_equity_usdt": { "$ref": "#/$defs/dec_nonneg" },
+    "cumulative_realized_pnl_usdt": { "$ref": "#/$defs/dec_signed" },
+    "total_unrealized_pnl_usdt": { "$ref": "#/$defs/dec_signed" },
+    "total_fees_paid_usdt": { "$ref": "#/$defs/dec_nonneg" },
+    "total_schedule_drift_cost_usdt": { "$ref": "#/$defs/dec_signed" },
+    "open_positions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/open_position" }
+    },
+    "closed_trades": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/closed_trade" }
+    },
+    "rejected_orders": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rejected_order" }
+    }
+  },
+  "$defs": {
+    "inst_id": { "type": "string", "pattern": "^[A-Z0-9]+-USDT$" },
+    "dec_pos": {
+      "type": "string",
+      "pattern": "^(?=[0-9.]*[1-9])[0-9]+(?:\\.[0-9]+)?$",
+      "description": "Finite decimal string, strictly > 0."
+    },
+    "dec_nonneg": {
+      "type": "string",
+      "pattern": "^[0-9]+(?:\\.[0-9]+)?$",
+      "description": "Finite decimal string, >= 0."
+    },
+    "dec_signed": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$",
+      "description": "Finite decimal string, signed."
+    },
+    "epoch_ms": { "type": "integer", "exclusiveMinimum": 0 },
+    "open_position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "position_id",
+        "inst_id",
+        "entry_order_id",
+        "entry_price",
+        "qty_base",
+        "notional_entry_usdt",
+        "entry_fee_usdt",
+        "candle_close_time",
+        "signal_timestamp",
+        "execution_timestamp",
+        "schedule_drift_ms",
+        "schedule_drift_bps",
+        "schedule_drift_cost_usdt",
+        "current_mark_price",
+        "unrealized_pnl_usdt"
+      ],
+      "properties": {
+        "position_id": { "type": "string", "minLength": 1 },
+        "inst_id": { "$ref": "#/$defs/inst_id" },
+        "entry_order_id": { "type": "string", "minLength": 1 },
+        "entry_price": { "$ref": "#/$defs/dec_pos" },
+        "qty_base": { "$ref": "#/$defs/dec_pos" },
+        "notional_entry_usdt": { "$ref": "#/$defs/dec_pos" },
+        "entry_fee_usdt": { "$ref": "#/$defs/dec_nonneg" },
+        "candle_close_time": { "$ref": "#/$defs/epoch_ms" },
+        "signal_timestamp": { "$ref": "#/$defs/epoch_ms" },
+        "execution_timestamp": { "$ref": "#/$defs/epoch_ms" },
+        "schedule_drift_ms": { "type": "integer" },
+        "schedule_drift_bps": { "$ref": "#/$defs/dec_signed" },
+        "schedule_drift_cost_usdt": { "$ref": "#/$defs/dec_signed" },
+        "current_mark_price": { "$ref": "#/$defs/dec_pos" },
+        "unrealized_pnl_usdt": { "$ref": "#/$defs/dec_signed" }
+      }
+    },
+    "closed_trade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trade_id",
+        "position_id",
+        "inst_id",
+        "entry_price",
+        "exit_price",
+        "qty_base",
+        "entry_fee_usdt",
+        "exit_fee_usdt",
+        "gross_pnl_usdt",
+        "net_realized_pnl_usdt",
+        "schedule_drift_cost_usdt",
+        "entry_timestamp",
+        "exit_timestamp",
+        "exit_reason"
+      ],
+      "properties": {
+        "trade_id": { "type": "string", "minLength": 1 },
+        "position_id": { "type": "string", "minLength": 1 },
+        "inst_id": { "$ref": "#/$defs/inst_id" },
+        "entry_price": { "$ref": "#/$defs/dec_pos" },
+        "exit_price": { "$ref": "#/$defs/dec_pos" },
+        "qty_base": { "$ref": "#/$defs/dec_pos" },
+        "entry_fee_usdt": { "$ref": "#/$defs/dec_nonneg" },
+        "exit_fee_usdt": { "$ref": "#/$defs/dec_nonneg" },
+        "gross_pnl_usdt": { "$ref": "#/$defs/dec_signed" },
+        "net_realized_pnl_usdt": { "$ref": "#/$defs/dec_signed" },
+        "schedule_drift_cost_usdt": { "$ref": "#/$defs/dec_signed" },
+        "entry_timestamp": { "$ref": "#/$defs/epoch_ms" },
+        "exit_timestamp": { "$ref": "#/$defs/epoch_ms" },
+        "exit_reason": {
+          "enum": ["TAKE_PROFIT", "STOP_LOSS", "TIME_STOP", "SIGNAL_EXIT"]
+        }
+      }
+    },
+    "rejected_order": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order_id",
+        "signal_id",
+        "inst_id",
+        "side",
+        "proposed_notional_usdt",
+        "constraint_code",
+        "details",
+        "timestamp_ms"
+      ],
+      "properties": {
+        "order_id": { "type": "string", "minLength": 1 },
+        "signal_id": { "type": "string", "minLength": 1 },
+        "inst_id": { "$ref": "#/$defs/inst_id" },
+        "side": { "enum": ["BUY", "SELL"] },
+        "proposed_notional_usdt": { "$ref": "#/$defs/dec_pos" },
+        "constraint_code": { "type": "string", "minLength": 1 },
+        "details": { "type": "string", "minLength": 1 },
+        "timestamp_ms": { "$ref": "#/$defs/epoch_ms" }
+      }
+    }
+  }
+}

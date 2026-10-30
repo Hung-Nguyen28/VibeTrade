@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibetrade.local/schema/v1.1/heartbeat.schema.json",
+  "title": "VibeTrade v1.1 heartbeat.json",
+  "description": "System health and operational telemetry for VibeTrade v1.1 surveillance cycles. Tracks drift, API status, execution metrics, and snapshot cryptographic hashes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "cycle_started_at_utc_ms",
+    "cycle_finished_at_utc_ms",
+    "duration_ms",
+    "schedule_drift_ms",
+    "status",
+    "okx_api_status",
+    "scanned_symbols_count",
+    "focus_sessions_triggered",
+    "orders_executed_count",
+    "orders_rejected_count",
+    "state_changed",
+    "snapshot_hashes",
+    "error_summary"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.1" },
+    "run_id": {
+      "type": "string",
+      "pattern": "^run:[a-zA-Z0-9_-]+:[0-9]+$"
+    },
+    "cycle_started_at_utc_ms": {
+      "type": "integer",
+      "exclusiveMinimum": 0
+    },
+    "cycle_finished_at_utc_ms": {
+      "type": "integer",
+      "exclusiveMinimum": 0
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "schedule_drift_ms": {
+      "type": "integer"
+    },
+    "status": {
+      "enum": ["HEALTHY", "DEGRADED", "ERROR"]
+    },
+    "okx_api_status": {
+      "enum": ["OK", "DEGRADED", "UNREACHABLE", "MOCK"]
+    },
+    "scanned_symbols_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "focus_sessions_triggered": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "orders_executed_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "orders_rejected_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "state_changed": {
+      "type": "boolean"
+    },
+    "snapshot_hashes": {
+      "$ref": "#/$defs/snapshot_hashes"
+    },
+    "error_summary": {
+      "type": ["string", "null"]
+    }
+  },
+  "$defs": {
+    "sha256_hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "snapshot_hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "market_snapshot_sha256",
+        "opportunity_queue_sha256",
+        "paper_portfolio_sha256",
+        "research_history_sha256"
+      ],
+      "properties": {
+        "market_snapshot_sha256": { "$ref": "#/$defs/sha256_hex" },
+        "opportunity_queue_sha256": { "$ref": "#/$defs/sha256_hex" },
+        "paper_portfolio_sha256": { "$ref": "#/$defs/sha256_hex" },
+        "research_history_sha256": { "$ref": "#/$defs/sha256_hex" }
+      }
+    }
+  }
+}

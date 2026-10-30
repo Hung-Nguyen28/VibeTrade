@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibetrade.local/schema/v1.1/market_snapshot.schema.json",
+  "title": "VibeTrade v1.1 market_snapshot.json",
+  "description": "OKX Public API (USDT Spot) snapshot. Prices/sizes are plain-notation decimal strings; timestamps are UTC epoch milliseconds. Candles are closed bars only (confirm == true, candle_close_time <= generated_at_utc_ms).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generated_at_utc_ms", "source", "inst_type", "quote_ccy", "instruments", "tickers", "candles", "orderbooks"],
+  "properties": {
+    "schema_version": { "const": "1.1" },
+    "generated_at_utc_ms": { "type": "integer", "exclusiveMinimum": 0 },
+    "source": { "const": "okx_public_v5" },
+    "inst_type": { "const": "SPOT" },
+    "quote_ccy": { "const": "USDT" },
+    "instruments": { "type": "array", "items": { "$ref": "#/$defs/instrument" } },
+    "tickers": { "type": "array", "items": { "$ref": "#/$defs/ticker" } },
+    "candles": { "type": "array", "items": { "$ref": "#/$defs/candle" } },
+    "orderbooks": { "type": "array", "items": { "$ref": "#/$defs/orderbook" } }
+  },
+  "$defs": {
+    "inst_id": { "type": "string", "pattern": "^[A-Z0-9]+-USDT$" },
+    "dec_pos": { "type": "string", "pattern": "^(?=[0-9.]*[1-9])[0-9]+(?:\\.[0-9]+)?$", "description": "Finite decimal string, plain notation, strictly > 0." },
+    "dec_nonneg": { "type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+)?$" },
+    "dec_signed": { "type": "string", "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$" },
+    "epoch_ms": { "type": "integer", "exclusiveMinimum": 0 },
+    "timeframe": { "enum": ["1m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "6H", "12H", "1D"] },
+    "instrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inst_id", "base_ccy", "quote_ccy", "tick_size", "lot_size", "min_size", "state"],
+      "properties": {
+        "inst_id": { "$ref": "#/$defs/inst_id" },
+        "base_ccy": { "type": "string", "minLength": 1 },
+        "quote_ccy": { "const": "USDT" },
+        "tick_size": { "$ref": "#/$defs/dec_pos" },
+        "lot_size": { "$ref": "#/$defs/dec_pos" },
+        "min_size": { "$ref": "#/$defs/dec_pos" },
+        "state": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ticker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inst_id", "last", "bid_px", "bid_sz", "ask_px", "ask_sz", "open_24h", "high_24h", "low_24h", "vol_base_24h", "vol_quote_24h", "spread_bps", "ts_utc_ms"],
+      "properties": {
+        "inst_id": { "$ref": "#/$defs/inst_id" },
+        "last": { "$ref": "#/$defs/dec_pos" },
+        "bid_px": { "$ref": "#/$defs/dec_pos" },
+        "bid_sz": { "$ref": "#/$defs/dec_pos" },
+        "ask_px": { "$ref": "#/$defs/dec_pos" },
+        "ask_sz": { "$ref": "#/$defs/dec_pos" },
+        "open_24h": { "$ref": "#/$defs/dec_pos" },
+        "high_24h": { "$ref": "#/$defs/dec_pos" },
+        "low_24h": { "$ref": "#/$defs/dec_pos" },
+        "vol_base_24h": { "$ref": "#/$defs/dec_nonneg" },
+        "vol_quote_24h": { "$ref": "#/$defs/dec_nonneg" },
+        "spread_bps": { "$ref": "#/$defs/dec_nonneg" },
+        "ts_utc_ms": { "$ref": "#/$defs/epoch_ms" }
+      }
+    },
+    "candle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inst_id", "timeframe", "candle_open_time", "candle_close_time", "open", "high", "low", "close", "vol_base", "vol_quote", "confirm"],
+      "properties": {
+        "inst_id": { "$ref": "#/$defs/inst_id" },
+        "timeframe": { "$ref": "#/$defs/timeframe" },
+        "candle_open_time": { "$ref": "#/$defs/epoch_ms" },
+        "candle_close_time": { "$ref": "#/$defs/epoch_ms" },
+        "open": { "$ref": "#/$defs/dec_pos" },
+        "high": { "$ref": "#/$defs/dec_pos" },
+        "low": { "$ref": "#/$defs/dec_pos" },
+        "close": { "$ref": "#/$defs/dec_pos" },
+        "vol_base": { "$ref": "#/$defs/dec_nonneg" },
+        "vol_quote": { "$ref": "#/$defs/dec_nonneg" },
+        "confirm": { "const": true }
+      }
+    },
+    "orderbook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inst_id", "ts_utc_ms", "best_bid", "best_ask", "mid_price", "spread_bps", "depth_levels", "bid_depth_usdt", "ask_depth_usdt", "imbalance_ratio", "probe_notional_usdt", "est_buy_slippage_bps", "est_sell_slippage_bps", "buy_fully_filled", "sell_fully_filled"],
+      "properties": {
+        "inst_id": { "$ref": "#/$defs/inst_id" },
+        "ts_utc_ms": { "$ref": "#/$defs/epoch_ms" },
+        "best_bid": { "$ref": "#/$defs/dec_pos" },
+        "best_ask": { "$ref": "#/$defs/dec_pos" },
+        "mid_price": { "$ref": "#/$defs/dec_pos" },
+        "spread_bps": { "$ref": "#/$defs/dec_nonneg" },
+        "depth_levels": { "type": "integer", "minimum": 1 },
+        "bid_depth_usdt": { "$ref": "#/$defs/dec_nonneg" },
+        "ask_depth_usdt": { "$ref": "#/$defs/dec_nonneg" },
+        "imbalance_ratio": { "$ref": "#/$defs/dec_signed" },
+        "probe_notional_usdt": { "$ref": "#/$defs/dec_pos" },
+        "est_buy_slippage_bps": { "oneOf": [{ "$ref": "#/$defs/dec_signed" }, { "type": "null" }] },
+        "est_sell_slippage_bps": { "oneOf": [{ "$ref": "#/$defs/dec_signed" }, { "type": "null" }] },
+        "buy_fully_filled": { "type": "boolean" },
+        "sell_fully_filled": { "type": "boolean" }
+      }
+    }
+  }
+}
